@@ -3,7 +3,6 @@ import { readFile, unlink, readdir, writeFile, mkdir } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { GoogleGenAI } from "@google/genai";
-import { Resend } from "resend";
 // import { lookup as mimeLookup } from "mime-types";
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType } from "docx";
 import * as XLSX from "xlsx";
@@ -55,8 +54,8 @@ function buildXlsx(markdown: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { uploadId, email, filename } = (await req.json()) as { uploadId: string; email: string; filename: string };
-    if (!uploadId || !email || !filename) return NextResponse.json({ error: "invalid params" }, { status: 400 });
+    const { uploadId, filename } = (await req.json()) as { uploadId: string; filename: string };
+    if (!uploadId || !filename) return NextResponse.json({ error: "invalid params" }, { status: 400 });
 
     const dir = join(tmpdir(), "zassha", "uploads", uploadId);
     const files = await readdir(dir).catch(() => []);
@@ -109,22 +108,7 @@ export async function POST(req: NextRequest) {
     const docx = await buildDocx(text, filename);
     const xlsx = buildXlsx(text);
 
-    // Send email via Resend
-    const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
-    if (!RESEND_API_KEY) return NextResponse.json({ error: "RESEND_API_KEY missing" }, { status: 500 });
-    const resend = new Resend(RESEND_API_KEY);
-    const attachments: { filename: string; content: Buffer; contentType?: string }[] = [
-      { filename: filename.replace(/\.[^/.]+$/, "") + ".docx", content: Buffer.from(docx), contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
-      { filename: filename.replace(/\.[^/.]+$/, "") + ".xlsx", content: Buffer.from(xlsx), contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
-    ];
-    await writeStatus("emailing", 92);
-    await resend.emails.send({
-      from: "ZASSHA <noreply@zassha.app>",
-      to: email,
-      subject: "ZASSHA Analysis Result",
-      text,
-      attachments: attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64"), contentType: a.contentType })),
-    });
+    // Email feature removed
 
     // Persist result (DB-less): write to tmp results
     await mkdir(resultsDir, { recursive: true });
@@ -150,5 +134,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "internal error" }, { status: 500 });
   }
 }
-
 

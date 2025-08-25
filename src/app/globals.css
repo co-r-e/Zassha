@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -171,3 +170,11 @@ body {
 }
 
 /* no accent gradients: intentionally left empty */
+
+/* Hide Next.js Dev Toolbar/Overlays in runtime (no-build distribution) */
+nextjs-portal,
+#__next-build-watcher,
+#__next-route-announcer,
+#__next-dev-overlay {
+  display: none !important;
+}

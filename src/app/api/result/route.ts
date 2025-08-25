@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
         "waiting-active": "処理待機中",
         generating: "解説を生成中",
         "building-attachments": "ドキュメント生成中",
-        emailing: "メール送信中",
         error: "エラー",
         done: "完了",
       };
@@ -46,5 +45,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "internal error" }, { status: 500 });
   }
 }
-
 

@@ -32,7 +32,9 @@ export async function POST(req: Request) {
     await mkdir(base, { recursive: true });
 
     const bb = Busboy({ headers: { "content-type": contentType } });
-    const incoming = Readable.fromWeb(req.body as any);
+    const webBody = req.body as ReadableStream<Uint8Array> | null;
+    if (!webBody) return NextResponse.json({ error: "empty body" }, { status: 400 });
+    const incoming = Readable.fromWeb(webBody);
 
     let savedPath = "";
     let savedName = "";
@@ -65,9 +67,9 @@ export async function POST(req: Request) {
             reject(Object.assign(new Error("file too large"), { status: 413 }));
           }
         });
-        file.on("error", (err: any) => {
+        file.on("error", (err: unknown) => {
           ws.destroy();
-          reject(err);
+          reject(err instanceof Error ? err : new Error("stream error"));
         });
         ws.on("error", (err) => reject(err));
         ws.on("close", () => {

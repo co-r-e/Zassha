@@ -7,10 +7,8 @@
 - `public`: Static assets served at the web root.
 - Config: `next.config.ts`, `tsconfig.json` (path alias `@/*`), `eslint.config.mjs`.
 
-## Build, Test, and Development Commands
-- `npm run dev`: Start local dev server with Turbopack at `http://localhost:3000`.
-- `npm run build`: Create a production build (outputs to `.next`).
-- `npm start`: Run the built app locally.
+## Run & Commands (No Build)
+- `npm start` (or `npm run dev`): Start the app with Turbopack at `http://localhost:3000`.
 - `npm run lint`: Lint with Next.js + TypeScript rules; fix issues before PRs.
 
 ## Coding Style & Naming Conventions
@@ -30,10 +28,10 @@
 ## Commit & Pull Request Guidelines
 - Commits: Use Conventional Commits (e.g., `feat: add upload limit`, `fix(api): handle empty file`).
 - PRs: Provide a clear description, link issues, include screenshots for UI changes, and a short testing note.
-- CI hygiene: Ensure `npm run lint` and `npm run build` pass locally before opening/merging.
+- CI hygiene: Ensure `npm run lint` passes locally before opening/merging.
 
 ## Security & Configuration Tips
 - Secrets: Store in `.env.local` (do not commit).
-- Required: `GEMINI_API_KEY`, `RESEND_API_KEY`.
+- Required: `GEMINI_API_KEY`.
 - Optional: `MAX_UPLOAD_BYTES`, `MAX_TMP_TTL_MS`, `GEMINI_FILE_WAIT_MS`.
 - Temp storage: Uploads/results use OS temp; old files are GC’d based on TTL.

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
+import Providers from "@/components/providers";
+import SidebarUploader from "@/components/SidebarUploader";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "next-themes";
+// ThemeProvider moved into Providers
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+        <Providers>
         <div className="min-h-dvh text-foreground bg-background">
           <aside className="fixed left-0 top-0 h-dvh w-[240px] border-r border-border p-6 bg-sidebar text-sidebar-foreground z-20">
             <div className="mb-6">
@@ -37,7 +39,9 @@ export default function RootLayout({
               <Image src="/logo-dark.svg" alt="ZASSHA" width={120} height={28} className="hidden dark:block" />
             </div>
             <div className="flex h-[calc(100%-40px)] flex-col">
-              {/* Sidebar upload menu removed */}
+              <div className="flex-1 overflow-hidden">
+                <SidebarUploader />
+              </div>
               <div className="mt-auto pt-4 border-t border-border">
                 <ThemeToggle />
               </div>
@@ -45,7 +49,7 @@ export default function RootLayout({
           </aside>
           <main className="ml-[240px] p-6 pt-4">{children}</main>
         </div>
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );

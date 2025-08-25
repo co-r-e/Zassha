@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
 [他の人が同じ作業を再現できるよう、以下の形式で詳細に記述]
 
 ### ステップ1: [ステップ名] 【所要時間xx分】
+**使用ツール:** [動画の内容から推察した具体的なツール名。例: Google Chrome / Excel / VS Code / Slack / Jira / GitHub / Terminal / Finder / Figma など製品名やSaaS名]
 - 具体的な操作1
 - 具体的な操作2
 - 具体的な操作3
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
 **業務推察:** [このステップで作業者が何を確認・検証しようとしているかを推察]
 
 ### ステップ2: [ステップ名] 【所要時間xx分】
+**使用ツール:** [動画の内容から推察した具体的なツール名]
 - 具体的な操作1
 - 具体的な操作2
 
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
 
 [必要に応じてステップを追加]
 
-業務詳細では、各ステップの所要時間を【所要時間xx分】の形式で記載し、各ステップの後に**業務推察:**として作業者の意図を推察してください。操作詳細では、ボタン名、メニュー名、入力値、クリック位置、キーボード操作、画面遷移など、第三者が同じ作業を完全に再現できる粒度で記述してください。`;
+業務詳細では、各ステップの所要時間を【所要時間xx分】の形式で記載し、各ステップで**使用ツール**を必ず明記し（できる限り具体的な製品名）、各ステップの後に**業務推察:**として作業者の意図を推察してください。操作詳細では、ボタン名、メニュー名、入力値、クリック位置、キーボード操作、画面遷移など、第三者が同じ作業を完全に再現できる粒度で記述してください。`;
         const promptSummary = `あなたは動画解析の専門家です。以下の構造で簡潔に出力してください（全体で500〜800字程度）：
 
 ## 概要
@@ -107,7 +109,7 @@ export async function POST(req: NextRequest) {
         });
 
         let acc = "";
-        let usageMetadata: any = null;
+        let usageMetadata: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } | null = null;
         for await (const chunk of g) {
           const t = chunk.text ?? undefined;
           if (t) {
@@ -116,7 +118,11 @@ export async function POST(req: NextRequest) {
           }
           // Capture usage metadata from the last chunk
           if (chunk.usageMetadata) {
-            usageMetadata = chunk.usageMetadata;
+            usageMetadata = chunk.usageMetadata as {
+              promptTokenCount?: number;
+              candidatesTokenCount?: number;
+              totalTokenCount?: number;
+            };
           }
         }
         // 'acc' holds the streamed markdown text
@@ -147,4 +153,3 @@ export async function POST(req: NextRequest) {
     },
   });
 }
-

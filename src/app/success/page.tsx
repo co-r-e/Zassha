@@ -48,7 +48,7 @@ export default function SuccessPage() {
             if (done) clearInterval(timer);
           }, intervalMs);
         }
-      } catch (e) {
+      } catch {
         setStatus("error");
         setMessage("結果の取得に失敗しました。");
       }
@@ -100,5 +100,3 @@ export default function SuccessPage() {
     </div>
   );
 }
-
-

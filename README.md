@@ -1,6 +1,6 @@
 ZASSHA is a Next.js app for analyzing videos and producing structured, reproducible task descriptions. It supports local uploads and server-side processing (Gemini Files API).
 
-## Quick Start
+## Quick Start (No Build)
 
 1) Install dependencies
 ```bash
@@ -13,9 +13,9 @@ cp .env.example .env.local
 # then edit .env.local to set API keys
 ```
 
-3) Run the dev server
+3) Start the app
 ```bash
-npm run dev
+npm start
 ```
 Open http://localhost:3000.
 
@@ -23,9 +23,7 @@ Open http://localhost:3000.
 - Node.js: see `.nvmrc` or `package.json#engines`.
 
 ## Scripts
-- `npm run dev`: Start local dev (Turbopack)
-- `npm run build`: Production build
-- `npm start`: Start built app
+- `npm start` (or `npm run dev`): Run the app with Turbopack
 - `npm run lint`: Lint with ESLint
 
 ## Contributing

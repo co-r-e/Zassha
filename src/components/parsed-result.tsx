@@ -10,6 +10,7 @@ type ParsedContent = {
   businessDetails?: Array<{
     stepName: string;
     operations: string[];
+    stepTool?: string;
     stepInference?: string;
   }>;
 };
@@ -21,7 +22,7 @@ function parseMarkdownContent(md: string): ParsedContent {
   };
 
   let currentSection = "";
-  let currentStep: { stepName: string; operations: string[]; stepInference?: string } | null = null;
+  let currentStep: { stepName: string; operations: string[]; stepInference?: string; stepTool?: string } | null = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -68,7 +69,9 @@ function parseMarkdownContent(md: string): ParsedContent {
         }
         break;
       case "businessDetails":
-        if (trimmed.startsWith("- ") && currentStep) {
+        if (trimmed.startsWith("**使用ツール:**") && currentStep) {
+          currentStep.stepTool = trimmed.replace(/^\*\*使用ツール:\*\*\s*/, "");
+        } else if (trimmed.startsWith("- ") && currentStep) {
           currentStep.operations.push(trimmed.substring(2));
         } else if (trimmed.startsWith("**業務推察:**") && currentStep) {
           currentStep.stepInference = trimmed.replace(/^\*\*業務推察:\*\*\s*/, "");
@@ -193,6 +196,7 @@ export default function ParsedResult({
                   <tr className="border-b border-border">
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-12">No.</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-60">ステップ名</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-48">使用ツール</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-80">操作詳細</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-96">業務推察</th>
                     <th className="text-center p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-20">展開</th>
@@ -214,6 +218,11 @@ export default function ParsedResult({
                       <td className="p-3 align-top">
                         <div className="text-xs font-medium text-foreground leading-relaxed">
                           {step.stepName}
+                        </div>
+                      </td>
+                      <td className="p-3 align-top">
+                        <div className="text-xs text-muted-foreground leading-relaxed">
+                          {step.stepTool || "不明"}
                         </div>
                       </td>
                       <td className="p-3 align-top">
@@ -275,5 +284,4 @@ export default function ParsedResult({
     </div>
   );
 }
-
 

@@ -9,9 +9,9 @@ Thank you for helping improve ZASSHA!
 How to contribute
 - Fork and create a feature branch.
 - Install deps: `npm ci`
-- Run dev server: `npm run dev`
+- Run app: `npm start` (or `npm run dev`)
 - Lint before committing: `npm run lint`
-- Build check: `npm run build`
+  
 
 PR checklist
 - Clear description and motivation; link issues.

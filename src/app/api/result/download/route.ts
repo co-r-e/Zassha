@@ -20,9 +20,8 @@ export async function GET(req: NextRequest) {
     const buf = await readFile(p);
     const mime = ext === ".docx" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     return new Response(new Uint8Array(buf).buffer, { headers: { "Content-Type": mime, "Content-Disposition": `attachment; filename=\"result${ext}\"` } });
-  } catch (e) {
+  } catch {
     return new Response("error", { status: 500 });
   }
 }
-
 
