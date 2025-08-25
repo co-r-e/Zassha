@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
-import { UploadCloud } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -39,14 +37,7 @@ export default function RootLayout({
               <Image src="/logo-dark.svg" alt="ZASSHA" width={120} height={28} className="hidden dark:block" />
             </div>
             <div className="flex h-[calc(100%-40px)] flex-col">
-              <nav className="mt-4 space-y-3">
-                <Link
-                  className="group relative flex items-center gap-2 text-sm px-2 py-2 rounded-md pl-3 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-6 before:w-1 before:rounded-full before:bg-sidebar-primary before:scale-y-0 before:opacity-0 before:transition before:duration-300 group-hover:before:scale-y-100 group-hover:before:opacity-100"
-                  href="/"
-                >
-                  <UploadCloud className="h-4 w-4" /> アップロード
-                </Link>
-              </nav>
+              {/* Sidebar upload menu removed */}
               <div className="mt-auto pt-4 border-t border-border">
                 <ThemeToggle />
               </div>
