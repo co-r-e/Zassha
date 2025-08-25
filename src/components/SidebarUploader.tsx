@@ -25,9 +25,9 @@ function formatBytes(bytes: number): string {
 
 export default function SidebarUploader() {
   const {
-    files, setFiles, isLoading, progress, error,
+    files, setFiles, isLoading, progressById, error,
     analysisMode, setAnalysisMode, previewUrlsById, videoMetaById, setVideoMeta,
-    handleDrop, handleDragOver, handleFileInput, handleAnalyze, clearAll,
+    handleDrop, handleDragOver, handleFileInput, handleAnalyze,
   } = useUpload();
 
   const selected = files.filter((f) => f.selected);
@@ -51,26 +51,36 @@ export default function SidebarUploader() {
         {files.length > 0 && (
           <div className="space-y-2 max-h-40 overflow-auto pr-1">
             {files.map((sf) => (
-              <div key={sf.id} className="flex items-center justify-between rounded-md border p-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  <input
-                    type="checkbox"
-                    className="h-3.5 w-3.5 accent-primary"
-                    checked={sf.selected}
-                    onChange={(e) => setFiles((prev) => prev.map((x) => (x.id === sf.id ? { ...x, selected: e.target.checked } : x)))}
-                    aria-label="選択"
-                    title="選択"
-                  />
-                  <span className="truncate max-w-[150px] text-[11px]">{sf.file.name}</span>
+              <div key={sf.id} className="rounded-md border p-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 accent-primary"
+                      checked={sf.selected}
+                      onChange={(e) => setFiles((prev) => prev.map((x) => (x.id === sf.id ? { ...x, selected: e.target.checked } : x)))}
+                      aria-label="選択"
+                      title="選択"
+                    />
+                    <span className="truncate max-w-[150px] text-[11px]">{sf.file.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="削除"
+                    className="ml-2 inline-flex items-center text-muted-foreground hover:text-primary"
+                    onClick={() => setFiles((prev) => prev.filter((x) => x.id !== sf.id))}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  aria-label="削除"
-                  className="ml-2 inline-flex items-center text-muted-foreground hover:text-primary"
-                  onClick={() => setFiles((prev) => prev.filter((x) => x.id !== sf.id))}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {typeof progressById[sf.id] === "number" && (
+                  <div className="mt-1">
+                    <Progress value={progressById[sf.id]} />
+                    <div className="mt-0.5 text-[10px] text-muted-foreground text-right">
+                      {Math.round(progressById[sf.id])}%
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -93,12 +103,7 @@ export default function SidebarUploader() {
           </div>
         </div>
 
-        {isLoading && (
-          <div>
-            <Progress value={progress} />
-            <div className="mt-1 text-[10px] text-muted-foreground">解析中...</div>
-          </div>
-        )}
+        {/* per-file progress shown above in the file list */}
         {error && <div className="text-[11px] text-destructive text-center">エラー: {error}</div>}
 
         <Button
@@ -110,16 +115,7 @@ export default function SidebarUploader() {
           onClick={() => void handleAnalyze()}
         >解析</Button>
 
-        {(files.length > 0) && (
-          <Button
-            type="button"
-            variant="ghost"
-            aria-label="リセット"
-            title="リセット"
-            className="w-full h-8 rounded-full border border-border bg-card text-foreground px-3 text-[11px]"
-            onClick={clearAll}
-          >リセット</Button>
-        )}
+        {/* 一括リセットボタンは不要のため削除 */}
 
         <div className="pt-2 border-t border-border">
           <div className="flex items-center gap-2 mb-2">

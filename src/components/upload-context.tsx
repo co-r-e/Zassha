@@ -10,7 +10,7 @@ type UploadContextValue = {
   files: SelectedFile[];
   setFiles: React.Dispatch<React.SetStateAction<SelectedFile[]>>;
   isLoading: boolean;
-  progress: number;
+  progressById: Record<string, number>;
   error: string | null;
   analysisMode: "summary" | "detail";
   setAnalysisMode: (m: "summary" | "detail") => void;
@@ -40,7 +40,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const [resultsById, setResultsById] = React.useState<Record<string, string>>({});
   const [tokensById, setTokensById] = React.useState<Record<string, Tokens>>({});
   const [error, setError] = React.useState<string | null>(null);
-  const [progress, setProgress] = React.useState<number>(0);
+  const [progressById, setProgressById] = React.useState<Record<string, number>>({});
   const [previewUrlsById, setPreviewUrlsById] = React.useState<Record<string, string>>({});
   const [videoMetaById, setVideoMetaById] = React.useState<Record<string, { duration: number; width: number; height: number }>>({});
   const [analysisMode, setAnalysisMode] = React.useState<"summary" | "detail">("detail");
@@ -82,11 +82,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     if (files.length === 0) return;
     setIsLoading(true);
     try {
-      setProgress(0);
       const targets = files.filter((f) => f.selected);
       if (targets.length === 0) throw new Error("解析対象が選択されていません");
       for (let i = 0; i < targets.length; i++) {
         const sf = targets[i];
+        setProgressById((prev) => ({ ...prev, [sf.id]: 0 }));
         const form = new FormData();
         form.append("file", sf.file);
         form.append("mode", analysisMode);
@@ -116,7 +116,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 tokens?: Tokens;
                 error?: string;
               };
-              if (typeof evt.progress === "number") setProgress(Math.max(0, Math.min(100, evt.progress)));
+              if (typeof evt.progress === "number")
+                setProgressById((prev) => ({ ...prev, [sf.id]: Math.max(0, Math.min(100, evt.progress!)) }));
               if (typeof evt.delta === "string") full += evt.delta;
               if (typeof evt.text === "string") full = evt.text;
               if (evt.tokens !== undefined) tokens = evt.tokens as Tokens;
@@ -126,13 +127,12 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         }
         setResultsById((prev) => ({ ...prev, [sf.id]: full }));
         setTokensById((prev) => ({ ...prev, [sf.id]: tokens }));
+        setProgressById((prev) => ({ ...prev, [sf.id]: 100 }));
       }
-      setProgress(100);
     } catch (err) {
       setError(err instanceof Error ? err.message : "処理に失敗しました");
     } finally {
       setIsLoading(false);
-      setTimeout(() => setProgress(0), 800);
     }
   }
 
@@ -150,7 +150,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     files,
     setFiles,
     isLoading,
-    progress,
+    progressById,
     error,
     analysisMode,
     setAnalysisMode,
