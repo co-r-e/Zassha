@@ -177,7 +177,7 @@ export default function ParsedResult({
                       <div className="text-xs font-medium text-foreground leading-relaxed">{r.task || t("unknown")}</div>
                     </td>
                     <td className="p-3 align-top">
-                      <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">{r.detail || ""}</div>
+                      <div className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{r.detail || ""}</div>
                     </td>
                   </tr>
                 ))}
@@ -306,7 +306,7 @@ export default function ParsedResult({
                             {step.operations.map((operation, opIndex) => (
                               <div key={opIndex} className="flex items-start gap-2">
                                 <span className="text-primary mt-1 flex-shrink-0 text-xs">•</span>
-                                <span className="text-xs text-muted-foreground leading-relaxed break-words">
+                                <span className="text-xs text-foreground leading-relaxed break-words">
                                   {operation}
                                 </span>
                               </div>

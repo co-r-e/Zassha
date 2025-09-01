@@ -83,12 +83,21 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
   async function handleAnalyze() {
     setError(null);
-    setResultsById({});
-    if (files.length === 0) return;
+    const targets = files.filter((f) => f.selected);
+    if (targets.length === 0) throw new Error(t("noSelectionError"));
+    // Clear only results/tokens for targets to avoid wiping past analyses
+    setResultsById((prev) => {
+      const next = { ...prev } as Record<string, string>;
+      for (const sf of targets) delete next[sf.id];
+      return next;
+    });
+    setTokensById((prev) => {
+      const next = { ...prev } as Record<string, Tokens>;
+      for (const sf of targets) delete next[sf.id];
+      return next;
+    });
     setIsLoading(true);
     try {
-      const targets = files.filter((f) => f.selected);
-      if (targets.length === 0) throw new Error(t("noSelectionError"));
       for (let i = 0; i < targets.length; i++) {
         const sf = targets[i];
         setProgressById((prev) => ({ ...prev, [sf.id]: 0 }));
