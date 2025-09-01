@@ -10,10 +10,15 @@ import * as XLSX from "xlsx";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function buildDocx(markdown: string, name: string) {
+function buildDocx(markdown: string, name: string, lang: "en" | "ja") {
   const lines = markdown.split(/\r?\n/);
   const rows: [string, string][] = [];
-  const headerIdx = lines.findIndex((l) => l.includes("|") && l.includes("業務工程") && l.includes("業務詳細"));
+  const headerIdx = lines.findIndex((l) =>
+    l.includes("|") && (
+      (l.includes("業務工程") && l.includes("業務詳細")) ||
+      (l.toLowerCase().includes("business task") && l.toLowerCase().includes("business details"))
+    )
+  );
   if (headerIdx >= 0) {
     for (let i = headerIdx + 1; i < lines.length; i++) {
       const L = lines[i];
@@ -26,17 +31,22 @@ function buildDocx(markdown: string, name: string) {
   const table = new Table({
     width: { type: WidthType.PERCENTAGE, size: 100 },
     rows: [
-      new TableRow({ children: [new TableCell({ children: [new Paragraph("業務工程")] }), new TableCell({ children: [new Paragraph("業務詳細")] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph(lang === "ja" ? "業務工程" : "Business Task")] }), new TableCell({ children: [new Paragraph(lang === "ja" ? "業務詳細" : "Business Details")] })] }),
       ...rows.map((r) => new TableRow({ children: [new TableCell({ children: [new Paragraph(r[0])] }), new TableCell({ children: [new Paragraph(r[1])] })] })),
     ],
   });
   return Packer.toBuffer(new Document({ sections: [{ properties: {}, children: [new Paragraph({ text: name, spacing: { after: 200 } }), table] }] }));
 }
 
-function buildXlsx(markdown: string) {
+function buildXlsx(markdown: string, lang: "en" | "ja") {
   const lines = markdown.split(/\r?\n/);
   const rows: [string, string][] = [];
-  const headerIdx = lines.findIndex((l) => l.includes("|") && l.includes("業務工程") && l.includes("業務詳細"));
+  const headerIdx = lines.findIndex((l) =>
+    l.includes("|") && (
+      (l.includes("業務工程") && l.includes("業務詳細")) ||
+      (l.toLowerCase().includes("business task") && l.toLowerCase().includes("business details"))
+    )
+  );
   if (headerIdx >= 0) {
     for (let i = headerIdx + 1; i < lines.length; i++) {
       const L = lines[i];
@@ -46,7 +56,7 @@ function buildXlsx(markdown: string) {
       rows.push([cells[1] || "", cells[2] || ""]);
     }
   }
-  const ws = XLSX.utils.aoa_to_sheet([["業務工程", "業務詳細"], ...rows]);
+  const ws = XLSX.utils.aoa_to_sheet([[lang === "ja" ? "業務工程" : "Business Task", lang === "ja" ? "業務詳細" : "Business Details"], ...rows]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Result");
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
@@ -54,7 +64,8 @@ function buildXlsx(markdown: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { uploadId, filename } = (await req.json()) as { uploadId: string; filename: string };
+    const { uploadId, filename, lang: langInput } = (await req.json()) as { uploadId: string; filename: string; lang?: "en" | "ja" };
+    const lang: "en" | "ja" = langInput ?? (req.headers.get("accept-language")?.toLowerCase().startsWith("ja") ? "ja" : "en");
     if (!uploadId || !filename) return NextResponse.json({ error: "invalid params" }, { status: 400 });
 
     const dir = join(tmpdir(), "zassha", "uploads", uploadId);
@@ -92,8 +103,9 @@ export async function POST(req: NextRequest) {
       latest = await ai.files.get({ name });
     }
 
-    const prompt =
-      "あなたは動画から手順書を作るアシスタントです。出力はマークダウンの表のみで返してください。コードブロック、前置き、後書き、補足文は一切出力しないでください。表の列は左から必ず『業務工程 | 業務詳細』の順にしてください。他の列は作らないでください。業務詳細は一挙手一投足の最小粒度で記述し、1操作=1行としてください。";
+    const prompt = lang === "ja"
+      ? "あなたは動画から手順書を作るアシスタントです。出力はマークダウンの表のみで返してください。コードブロック、前置き、後書き、補足文は一切出力しないでください。表の列は左から必ず『業務工程 | 業務詳細』の順にしてください。他の列は作らないでください。業務詳細は一挙手一投足の最小粒度で記述し、1操作=1行としてください。"
+      : "You are an assistant that creates step-by-step manuals from videos. LANGUAGE POLICY: Output only in English. If on-screen text or speech is in Japanese or any non-English language, translate the content into natural English. Return only a Markdown table with exactly two columns in order: 'Business Task | Business Details'. Do not output code blocks, headers, or commentary. Describe actions at the smallest granularity, 1 action per row.";
 
     await writeStatus("generating", 60);
     const resp = await ai.models.generateContent({
@@ -105,8 +117,8 @@ export async function POST(req: NextRequest) {
 
     // Build attachments
     await writeStatus("building-attachments", 85);
-    const docx = await buildDocx(text, filename);
-    const xlsx = buildXlsx(text);
+    const docx = await buildDocx(text, filename, lang);
+    const xlsx = buildXlsx(text, lang);
 
     // Email feature removed
 
@@ -134,4 +146,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "internal error" }, { status: 500 });
   }
 }
-

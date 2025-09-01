@@ -5,6 +5,7 @@ import { useUpload } from "@/components/upload-context";
 import { Button } from "@/components/ui/button";
 import { FileVideo, Timer, Maximize2, HardDrive, Trash2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { useI18n } from "@/components/i18n-context";
 
 function formatDuration(totalSeconds: number): string {
   const s = Math.floor(totalSeconds % 60);
@@ -24,9 +25,10 @@ function formatBytes(bytes: number): string {
 }
 
 export default function SidebarUploader() {
+  const { t } = useI18n();
   const {
     files, setFiles, isLoading, progressById, error,
-    analysisMode, setAnalysisMode, previewUrlsById, videoMetaById, setVideoMeta,
+    analysisMode, setAnalysisMode, hint, setHint, previewUrlsById, videoMetaById, setVideoMeta,
     handleDrop, handleDragOver, handleFileInput, handleAnalyze,
   } = useUpload();
 
@@ -44,7 +46,7 @@ export default function SidebarUploader() {
               onChange={(e) => { handleFileInput(e.target.files); e.currentTarget.value = ""; }}
               className="sr-only"
             />
-            動画をドラッグ＆ドロップ、またはクリック
+            {t("dropOrClick")}
           </label>
         </div>
 
@@ -59,14 +61,14 @@ export default function SidebarUploader() {
                       className="h-3.5 w-3.5 accent-primary"
                       checked={sf.selected}
                       onChange={(e) => setFiles((prev) => prev.map((x) => (x.id === sf.id ? { ...x, selected: e.target.checked } : x)))}
-                      aria-label="選択"
-                      title="選択"
+                      aria-label={t("select")}
+                      title={t("select")}
                     />
                     <span className="truncate max-w-[150px] text-[11px]">{sf.file.name}</span>
                   </div>
                   <button
                     type="button"
-                    aria-label="削除"
+                    aria-label={t("delete")}
                     className="ml-2 inline-flex items-center text-muted-foreground hover:text-primary"
                     onClick={() => setFiles((prev) => prev.filter((x) => x.id !== sf.id))}
                   >
@@ -93,34 +95,46 @@ export default function SidebarUploader() {
               onClick={() => setAnalysisMode("summary")}
               className={`px-2 py-1 text-[11px] rounded-full transition-colors ${analysisMode === "summary" ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"}`}
               aria-pressed={analysisMode === "summary"}
-            >概要</button>
+            >{t("summary")}</button>
             <button
               type="button"
               onClick={() => setAnalysisMode("detail")}
               className={`px-2 py-1 text-[11px] rounded-full transition-colors ${analysisMode === "detail" ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"}`}
               aria-pressed={analysisMode === "detail"}
-            >詳細</button>
+            >{t("detail")}</button>
           </div>
         </div>
 
+        <div>
+          <label className="block text-[11px] mb-1 text-muted-foreground">{t("hintLabel")}</label>
+          <input
+            type="text"
+            value={hint}
+            onChange={(e) => setHint(e.target.value)}
+            placeholder={t("hintPlaceholder")}
+            className="w-full rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground px-2 py-1 text-[12px]"
+            maxLength={160}
+          />
+        </div>
+
         {/* per-file progress shown above in the file list */}
-        {error && <div className="text-[11px] text-destructive text-center">エラー: {error}</div>}
+        {error && <div className="text-[11px] text-destructive text-center">{t("errorPrefix")}: {error}</div>}
 
         <Button
           type="button"
           disabled={isLoading || selected.length === 0}
-          aria-label="解析"
+          aria-label={t("analyze")}
           className="w-full h-8 text-[12px] px-3 py-1.5 mt-1"
-          title={selected.length === 0 ? "動画をアップロードしてください" : undefined}
+          title={selected.length === 0 ? t("analyzeHint") : undefined}
           onClick={() => void handleAnalyze()}
-        >解析</Button>
+        >{t("analyze")}</Button>
 
         {/* 一括リセットボタンは不要のため削除 */}
 
         <div className="pt-2 border-t border-border">
           <div className="flex items-center gap-2 mb-2">
             <FileVideo className="h-3.5 w-3.5 text-foreground" />
-            <h2 className="font-semibold text-[12px] truncate">プレビュー</h2>
+            <h2 className="font-semibold text-[12px] truncate">{t("preview")}</h2>
           </div>
           {selected.length > 0 ? (
             <div className="space-y-3 max-h-64 overflow-auto pr-1">
@@ -147,7 +161,7 @@ export default function SidebarUploader() {
             </div>
           ) : (
             <div className="text-[11px] text-muted-foreground border border-dashed border-border rounded-md p-4 bg-card text-center">
-              アップロード後にここに表示されます。
+              {t("showAfterUpload")}
             </div>
           )}
         </div>

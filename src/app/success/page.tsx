@@ -3,8 +3,10 @@ import * as React from "react";
 import Link from "next/link";
 import ParsedResult from "@/components/parsed-result";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/components/i18n-context";
 
 export default function SuccessPage() {
+  const { t } = useI18n();
   const [status, setStatus] = React.useState<"idle" | "queued" | "done" | "error">("idle");
   const [text, setText] = React.useState<string>("");
   const [message, setMessage] = React.useState<string>("");
@@ -29,7 +31,17 @@ export default function SuccessPage() {
           if (r?.status === "queued" && typeof r.progress === "number") {
             setStatus("queued");
             setProgress(Math.max(0, Math.min(100, r.progress as number)));
-            setMessage(r?.phaseLabel ? `進行中: ${r.phaseLabel} (${r.progress}%)` : `進行中 (${r.progress}%)`);
+            const phaseLabels: Record<string, string> = {
+              starting: t("overview"),
+              "uploading-to-gemini": "Gemini",
+              "waiting-active": "Waiting",
+              generating: t("analysisResult"),
+              "building-attachments": "Docs",
+              error: t("errorOccurred"),
+              done: "Done",
+            };
+            const label = phaseLabels[r.phase as string] || "";
+            setMessage(`${t("inProgressPrefix")}${label ? ": " + label : ""} (${r.progress}%)`);
           }
           return false;
         };
@@ -41,7 +53,7 @@ export default function SuccessPage() {
             if (Date.now() - start > timeoutMs) {
               clearInterval(timer);
               setStatus("error");
-              setMessage("タイムアウトしました。しばらくしてから履歴をご確認ください。");
+              setMessage(t("timeout"));
               return;
             }
             const done = await poll();
@@ -50,20 +62,20 @@ export default function SuccessPage() {
         }
       } catch {
         setStatus("error");
-        setMessage("結果の取得に失敗しました。");
+        setMessage(t("fetchError"));
       }
     }
     void run();
-  }, []);
+  }, [t]);
 
   return (
     <div className="min-h-dvh flex items-start justify-center">
       <div className="w-full max-w-[900px] space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold">処理が完了しました</h1>
+          <h1 className="text-lg font-semibold">{t("processingDone")}</h1>
           <div className="flex items-center gap-2">
             <Link href="/">
-              <Button variant="outline">トップへ</Button>
+              <Button variant="outline">{t("goHome")}</Button>
             </Link>
             {/* 履歴機能は廃止 */}
           </div>
@@ -71,7 +83,7 @@ export default function SuccessPage() {
 
         {status === "queued" && (
           <div className="border border-border rounded-md p-4 text-sm text-muted-foreground">
-            <div className="mb-2">{message || "解析を実行中です。完了までお待ちください…"}</div>
+            <div className="mb-2">{message || t("queuedMessage")}</div>
             <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
               <div
                 className="h-full bg-foreground animate-[progress-stripes_1s_linear_infinite]"
@@ -82,7 +94,7 @@ export default function SuccessPage() {
         )}
         {status === "error" && (
           <div className="border border-destructive rounded-md p-4 text-sm text-destructive">
-            {message || "エラーが発生しました。"}
+            {message || t("errorOccurred")}
           </div>
         )}
         {status === "done" && (
@@ -90,8 +102,8 @@ export default function SuccessPage() {
             <ParsedResult source={text} />
             {uploadId && (
               <div className="mt-3 flex gap-2">
-                <a className="text-xs underline" href={`/api/result/download?uploadId=${uploadId}&type=docx`}>Wordをダウンロード</a>
-                <a className="text-xs underline" href={`/api/result/download?uploadId=${uploadId}&type=xlsx`}>Excelをダウンロード</a>
+                <a className="text-xs underline" href={`/api/result/download?uploadId=${uploadId}&type=docx`}>{t("downloadWord")}</a>
+                <a className="text-xs underline" href={`/api/result/download?uploadId=${uploadId}&type=xlsx`}>{t("downloadExcel")}</a>
               </div>
             )}
           </div>

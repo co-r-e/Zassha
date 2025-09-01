@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useI18n } from "@/components/i18n-context";
 
 export type SelectedFile = { id: string; file: File; selected: boolean };
 
@@ -14,6 +15,8 @@ type UploadContextValue = {
   error: string | null;
   analysisMode: "summary" | "detail";
   setAnalysisMode: (m: "summary" | "detail") => void;
+  hint: string;
+  setHint: (v: string) => void;
   resultsById: Record<string, string>;
   tokensById: Record<string, Tokens>;
   previewUrlsById: Record<string, string>;
@@ -35,6 +38,7 @@ export function useUpload() {
 }
 
 export function UploadProvider({ children }: { children: React.ReactNode }) {
+  const { t, lang } = useI18n();
   const [files, setFiles] = React.useState<SelectedFile[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [resultsById, setResultsById] = React.useState<Record<string, string>>({});
@@ -44,6 +48,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const [previewUrlsById, setPreviewUrlsById] = React.useState<Record<string, string>>({});
   const [videoMetaById, setVideoMetaById] = React.useState<Record<string, { duration: number; width: number; height: number }>>({});
   const [analysisMode, setAnalysisMode] = React.useState<"summary" | "detail">("detail");
+  const [hint, setHint] = React.useState("");
 
   React.useEffect(() => {
     const selected = files.filter((f) => f.selected);
@@ -83,13 +88,15 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const targets = files.filter((f) => f.selected);
-      if (targets.length === 0) throw new Error("解析対象が選択されていません");
+      if (targets.length === 0) throw new Error(t("noSelectionError"));
       for (let i = 0; i < targets.length; i++) {
         const sf = targets[i];
         setProgressById((prev) => ({ ...prev, [sf.id]: 0 }));
         const form = new FormData();
         form.append("file", sf.file);
         form.append("mode", analysisMode);
+        form.append("lang", lang);
+        if (hint && hint.trim()) form.append("hint", hint.trim());
         const res = await fetch("/api/explain/stream", { method: "POST", body: form });
         if (!res.ok || !res.body) {
           const json: unknown = await res.json().catch(() => ({} as unknown));
@@ -130,7 +137,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         setProgressById((prev) => ({ ...prev, [sf.id]: 100 }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "処理に失敗しました");
+      setError(err instanceof Error ? err.message : t("genericError"));
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +148,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setResultsById({});
     setTokensById({});
     setError(null);
-    setProgress(0);
+    setProgressById({});
     setVideoMetaById({});
     setPreviewUrlsById({});
   }
@@ -154,6 +161,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     error,
     analysisMode,
     setAnalysisMode,
+    hint,
+    setHint,
     resultsById,
     tokensById,
     previewUrlsById,

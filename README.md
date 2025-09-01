@@ -1,3 +1,11 @@
+<p align="center">
+  <img src="./public/logo.svg" alt="ZASSHA" width="480" />
+</p>
+
+<p align="center">
+  <b>English</b> · <a href="./README.ja.md">日本語</a>
+</p>
+
 ZASSHA is a Next.js app for analyzing videos and producing structured, reproducible task descriptions. It supports local uploads and server-side processing (Gemini Files API).
 
 ## Quick Start (No Build)

@@ -4,8 +4,10 @@ import * as React from "react";
 import { useTheme } from "next-themes";
 import { Sun, Moon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { useI18n } from "@/components/i18n-context";
 
 export default function ThemeToggle() {
+  const { t } = useI18n();
   const { theme, systemTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
@@ -21,13 +23,12 @@ export default function ThemeToggle() {
       <Switch
         checked={isDark}
         onCheckedChange={(v) => setTheme(v ? "dark" : "light")}
-        aria-label="テーマ切替"
+        aria-label={t("themeToggleAria")}
         className="cursor-pointer"
       />
       <Moon className={`h-4 w-4 ${isDark ? "text-foreground" : "text-muted-foreground"}`} aria-hidden />
     </div>
   );
 }
-
 
 

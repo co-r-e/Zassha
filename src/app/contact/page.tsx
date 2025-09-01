@@ -1,10 +1,13 @@
+"use client";
+import { useI18n } from "@/components/i18n-context";
+
 export default function ContactPage() {
+  const { t } = useI18n();
   return (
     <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-4">お問い合わせ</h1>
-      <p className="text-sm text-muted-foreground">ご要望や不具合はこのページからご連絡ください（フォームは後日追加予定）。</p>
+      <h1 className="text-2xl font-bold mb-4">{t("contactTitle")}</h1>
+      <p className="text-sm text-muted-foreground">{t("contactDescription")}</p>
     </div>
   );
 }
-
 
