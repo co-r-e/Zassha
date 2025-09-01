@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type Lang = "en" | "ja";
 
@@ -138,13 +139,25 @@ const ja = {
 type Dict = typeof en;
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [lang, setLang] = React.useState<Lang>(() => {
     if (typeof window === "undefined") return "en";
-    const saved = window.localStorage.getItem(LS_KEY) as Lang | null;
-    if (saved === "en" || saved === "ja") return saved;
+    // URL優先: /ja で始まるか
+    const path = window.location.pathname || "/";
+    if (path === "/ja" || path.startsWith("/ja/")) return "ja";
     return "en";
   });
 
+  // URL変化に応じて言語を同期
+  React.useEffect(() => {
+    if (!pathname) return;
+    const urlLang: Lang = pathname === "/ja" || pathname.startsWith("/ja/") ? "ja" : "en";
+    setLang((prev) => (prev === urlLang ? prev : urlLang));
+  }, [pathname]);
+
+  // 言語属性とLS反映
   React.useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.lang = lang;
@@ -155,7 +168,19 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const value: I18nContextValue = {
     lang,
     setLang,
-    toggleLang: () => setLang((p) => (p === "en" ? "ja" : "en")),
+    toggleLang: () => {
+      const path = pathname || "/";
+      const qs = searchParams?.toString();
+      if (lang === "en") {
+        // to JA → 先頭に /ja を付与
+        const nextPath = path === "/" ? "/ja" : `/ja${path}`;
+        router.push(qs ? `${nextPath}?${qs}` : nextPath);
+      } else {
+        // to EN → 先頭の /ja を剥がす
+        const nextPath = path === "/ja" ? "/" : path.replace(/^\/ja(?=\/)/, "");
+        router.push(qs ? `${nextPath}?${qs}` : nextPath);
+      }
+    },
     t: ((key: keyof Dict) => {
       const d = lang === "ja" ? ja : en;
       const val = d[key];

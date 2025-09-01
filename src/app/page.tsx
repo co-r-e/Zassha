@@ -22,7 +22,7 @@ export default function Home() {
             <div className="min-w-[900px] pr-4 px-2 pb-6">
               {files.map((sf) => (
                 <div key={sf.id} className="rounded-xl bg-card p-4 border border-border mb-4">
-                  <div className="flex items-center justify-between gap-3 text-sm font-semibold mb-4 border-b border-border pb-3 text-primary">
+                  <div className="flex items-center justify-between gap-3 text-sm font-semibold mb-4 pb-3 text-primary">
                     <span className="truncate">{sf.file.name}</span>
                   </div>
                   {resultsById[sf.id] ? (
@@ -41,4 +41,3 @@ export default function Home() {
     </div>
   );
 }
-

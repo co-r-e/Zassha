@@ -46,7 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 </div>
               </div>
             </aside>
-            <main className="ml-[240px] p-6 pt-4">{children}</main>
+            <main className="ml-[240px] p-6 pt-4 bg-sidebar dark:bg-background">{children}</main>
           </div>
         </Providers>
       </body>

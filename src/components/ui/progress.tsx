@@ -20,11 +20,10 @@ export function Progress({ value, className }: ProgressProps) {
       aria-valuenow={Math.round(clamped)}
     >
       <div className="relative h-full w-full">
-        {/* fill bar (turns green when done) */}
+        {/* fill bar (keeps same color when done) */}
         <div
           className={cn(
-            "absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-[cubic-bezier(.22,1,.36,1)]",
-            done ? "bg-green-500" : "bg-foreground",
+            "absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-[cubic-bezier(.22,1,.36,1)] bg-foreground",
           )}
           style={{ width: `${clamped}%` }}
         />
@@ -35,18 +34,15 @@ export function Progress({ value, className }: ProgressProps) {
             style={{ width: `${clamped}%` }}
           />
         )}
-        {/* subtle glow (green when done) */}
+        {/* subtle glow (no color change on done) */}
         <div
           className="absolute inset-y-0 left-0 rounded-full"
           style={{
             width: `${clamped}%`,
-            boxShadow: done
-              ? "0 0 14px rgba(34,197,94,0.45)" /* green-500 */
-              : "0 0 16px rgba(12,41,232,0.35)",
+            boxShadow: "0 0 16px rgba(12,41,232,0.35)",
           }}
         />
       </div>
     </div>
   );
 }
-

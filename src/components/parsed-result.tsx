@@ -163,7 +163,7 @@ export default function ParsedResult({
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-12">No.</th>
-                  <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-60">{t("stepName")}</th>
+                  <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-56">{t("stepName")}</th>
                   <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30">{t("businessDetails")}</th>
                 </tr>
               </thead>
@@ -271,8 +271,8 @@ export default function ParsedResult({
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-12">No.</th>
-                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-60">{t("stepName")}</th>
-                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-48">{t("usedTool")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-56">{t("stepName")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-44">{t("usedTool")}</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-80">{t("operations")}</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-96">{t("stepInference")}</th>
                   </tr>
@@ -296,7 +296,7 @@ export default function ParsedResult({
                         </div>
                       </td>
                       <td className="p-3 align-top">
-                        <div className="text-xs text-muted-foreground leading-relaxed">
+                        <div className="text-xs text-foreground leading-relaxed">
                           {step.stepTool || t("unknown")}
                         </div>
                       </td>
@@ -313,13 +313,13 @@ export default function ParsedResult({
                             ))}
                           </div>
                         ) : (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-foreground">
                             {tCount(lang, "operationsCount", step.operations.length)}
                           </div>
                         )}
                       </td>
                       <td className="p-3 align-top">
-                        <div className="text-xs text-muted-foreground leading-relaxed">
+                        <div className="text-xs text-foreground leading-relaxed">
                           {step.stepInference || t("noInference")}
                         </div>
                       </td>
@@ -330,7 +330,7 @@ export default function ParsedResult({
             </div>
 
             {/* Expand All / Collapse All Controls */}
-            <div className="flex justify-center gap-2 mt-4 pt-4 border-t border-border">
+            <div className="flex justify-center gap-2 mt-4 pt-4">
               <button
                 onClick={() => setExpandedSteps(new Set(content.businessDetails?.map((_, i) => i) || []))}
                 className="text-xs text-primary hover:text-primary/80 transition-colors px-3 py-1 rounded border border-primary/20 hover:bg-primary/10"
