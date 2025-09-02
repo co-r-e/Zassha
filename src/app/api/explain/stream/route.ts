@@ -135,16 +135,16 @@ In Business Details, write each step's duration as [Duration xx min], always inc
 - [視聴後に取るべきアクション 2-3個]
 
 ## 業務詳細（簡略）
-[主要なステップを2〜4つ、各ステップは以下の形式で簡潔に記述]
+[主要なステップを2〜4つ、各ステップは以下の形式で簡潔に記述。各ステップの見出しに【所要時間xx分】を含めてください]
 
-### ステップ1: [ステップ名]
+### ステップ1: [ステップ名] 【所要時間xx分】
 **使用ツール:** [動画の内容から推察した具体的なツール名]
 - 代表的な操作1（簡潔）
 - 代表的な操作2（簡潔）
 
 **業務推察:** [このステップの目的・意図を1行で]
 
-### ステップ2: [ステップ名]
+### ステップ2: [ステップ名] 【所要時間xx分】
 **使用ツール:** [動画の内容から推察した具体的なツール名]
 - 代表的な操作1（簡潔）
 - 代表的な操作2（簡潔）
@@ -172,16 +172,16 @@ Reference (optional): ${hint ? hint : "(none)"}
 - [2–3 actions to take after watching]
 
 ## Business Details (Brief)
-[List 2–4 main steps, each as below]
+[List 2–4 main steps, each as below. Include [Duration xx min] in each step heading.]
 
-### Step 1: [Step name]
+### Step 1: [Step name] [Duration xx min]
 **Used Tool:** [Specific tool name inferred from the video]
 - Representative operation 1 (concise)
 - Representative operation 2 (concise)
 
 **Business Inference:** [One-line purpose/intention of the step]
 
-### Step 2: [Step name]
+### Step 2: [Step name] [Duration xx min]
 **Used Tool:** [Specific tool name]
 - Representative operation 1 (concise)
 - Representative operation 2 (concise)
