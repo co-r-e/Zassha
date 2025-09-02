@@ -46,7 +46,31 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 </div>
               </div>
             </aside>
-            <main className="ml-[240px] p-6 pt-4 bg-sidebar dark:bg-background">{children}</main>
+            <div className="ml-[240px] min-h-dvh flex flex-col bg-sidebar dark:bg-background">
+              <main className="flex-1 p-6 pt-4">{children}</main>
+              <footer className="px-6 py-3 border-t border-border text-[11px] text-muted-foreground bg-sidebar dark:bg-background">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>© {new Date().getFullYear()} CORe Inc.</span>
+                  <a
+                    href="https://co-r-e.net"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-foreground"
+                  >
+                    Company
+                  </a>
+                  <span className="text-muted-foreground/50">•</span>
+                  <a
+                    href="https://co-r-e.net/contact"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-foreground"
+                  >
+                    Contact
+                  </a>
+                </div>
+              </footer>
+            </div>
           </div>
         </Providers>
       </body>
