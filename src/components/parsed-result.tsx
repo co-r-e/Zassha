@@ -208,7 +208,7 @@ export default function ParsedResult({
             {/* Overview with Duration */}
             <div>
               <div className="text-[11px] font-semibold text-muted-foreground mb-1">{t("overview")}</div>
-              <div className="text-xs text-muted-foreground leading-relaxed mb-2">
+              <div className="text-xs text-foreground leading-relaxed mb-2">
                 {content.overview || t("noOverview")}
               </div>
               {content.duration && (
@@ -225,7 +225,7 @@ export default function ParsedResult({
                 <Eye className="h-3 w-3 text-primary" />
                 <span className="text-[11px] font-semibold text-muted-foreground">{t("businessInference")}</span>
               </div>
-              <div className="text-xs text-muted-foreground leading-relaxed">
+              <div className="text-xs text-foreground leading-relaxed">
                 {content.businessInference || t("noInference")}
               </div>
             </div>

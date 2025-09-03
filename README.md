@@ -12,7 +12,7 @@ ZASSHA is a Next.js app for analyzing videos and producing structured, reproduci
 
 1) Install dependencies
 ```bash
-npm ci
+npm install
 ```
 
 2) Configure environment

@@ -32,6 +32,4 @@
 
 ## Security & Configuration Tips
 - Secrets: Store in `.env.local` (do not commit).
-- Required: `GEMINI_API_KEY`.
-- Optional: `MAX_UPLOAD_BYTES`, `MAX_TMP_TTL_MS`, `GEMINI_FILE_WAIT_MS`.
-- Temp storage: Uploads/results use OS temp; old files are GC’d based on TTL.
+- Required: `GEMINI_API_KEY` only.
