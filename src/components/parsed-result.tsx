@@ -5,180 +5,11 @@ import NextImage from "next/image";
 import Lightbox from "@/components/ui/lightbox";
 import { Clock, Eye, List } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
+import { parseMarkdownContent, parseTwoColTable } from "@/lib/parse-content";
 
-type ParsedContent = {
-  overview?: string;
-  duration?: string;
-  businessInference?: string;
-  businessDetails?: Array<{
-    stepName: string;
-    operations: Array<{ text: string; opTimestamp?: string; opTimeSec?: number }>;
-    stepTool?: string;
-    stepInference?: string;
-    stepTimestamp?: string;
-    timeStartSec?: number;
-    timeEndSec?: number;
-  }>;
-};
+// type imports are handled in parse-content users as needed
 
-function parseTwoColTable(md: string): Array<{ task: string; detail: string }> {
-  const lines = md.split(/\r?\n/);
-  const headerIdx = lines.findIndex((l) => {
-    if (!l.includes("|")) return false;
-    const low = l.toLowerCase();
-    return (
-      (low.includes("business task") && low.includes("business details")) ||
-      (l.includes("業務工程") && l.includes("業務詳細"))
-    );
-  });
-  if (headerIdx < 0) return [];
-  const rows: Array<{ task: string; detail: string }> = [];
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    const L = lines[i];
-    if (!L.includes("|")) {
-      // stop when table ends (first non-table line after header separator)
-      if (rows.length > 0) break;
-      continue;
-    }
-    const cells = L.split("|").map((s) => s.trim());
-    if (cells.length < 4) continue;
-    const task = cells[1] || "";
-    const detail = cells[2] || "";
-    if (task || detail) rows.push({ task, detail });
-  }
-  return rows;
-}
-
-function parseTimestampToSeconds(ts: string): number | null {
-  // supports mm:ss or hh:mm:ss
-  const parts = ts.split(":").map((p) => p.trim());
-  if (parts.some((p) => p === "" || /[^0-9]/.test(p))) return null;
-  let h = 0, m = 0, s = 0;
-  if (parts.length === 2) {
-    [m, s] = parts.map((x) => Number(x));
-  } else if (parts.length === 3) {
-    [h, m, s] = parts.map((x) => Number(x));
-  } else {
-    return null;
-  }
-  if ([h, m, s].some((n) => Number.isNaN(n))) return null;
-  return h * 3600 + m * 60 + s;
-}
-
-function parseTimestampField(raw: string): { start?: number; end?: number; label: string } | null {
-  // Accept formats like "00:45", "00:45–01:20" or "00:45-01:20"
-  const cleaned = raw.replace(/\s+/g, "");
-  const m = cleaned.split(/[–-]/);
-  if (m.length === 1) {
-    const t = parseTimestampToSeconds(m[0]);
-    if (t == null) return null;
-    return { start: t, label: raw.trim() };
-  }
-  if (m.length === 2) {
-    const a = parseTimestampToSeconds(m[0]);
-    const b = parseTimestampToSeconds(m[1]);
-    if (a == null || b == null) return null;
-    const [start, end] = a <= b ? [a, b] : [b, a];
-    return { start, end, label: raw.trim() };
-  }
-  return null;
-}
-
-function parseMarkdownContent(md: string): ParsedContent {
-  const lines = md.split(/\r?\n/);
-  const result: ParsedContent = {
-    businessDetails: []
-  };
-
-  let currentSection = "";
-  let currentStep: { stepName: string; operations: Array<{ text: string; opTimestamp?: string; opTimeSec?: number }>; stepInference?: string; stepTool?: string; stepTimestamp?: string; timeStartSec?: number; timeEndSec?: number } | null = null;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("## 概要") || trimmed.toLowerCase().startsWith("## overview")) {
-      currentSection = "overview";
-      continue;
-    } else if (trimmed.startsWith("## 所要時間") || trimmed.toLowerCase().startsWith("## duration")) {
-      currentSection = "duration";
-      continue;
-    } else if (trimmed.startsWith("## 業務推察") || trimmed.toLowerCase().startsWith("## business inference")) {
-      currentSection = "businessInference";
-      continue;
-    } else if (trimmed.startsWith("## 業務詳細") || trimmed.toLowerCase().startsWith("## business details")) {
-      currentSection = "businessDetails";
-      continue;
-    } else if (trimmed.startsWith("### ")) {
-      // Save previous step if exists
-      if (currentStep) {
-        result.businessDetails!.push(currentStep);
-      }
-      // Start new step
-      const stepName = trimmed
-        .replace(/^### /, "")
-        .replace(/^ステップ\d+:\s*/, "")
-        .replace(/^step\s*\d+:\s*/i, "");
-      currentStep = { stepName, operations: [] };
-      continue;
-    }
-
-    if (!trimmed) continue;
-
-    switch (currentSection) {
-      case "overview":
-        if (!result.overview && !trimmed.startsWith("#")) {
-          result.overview = trimmed.replace(/^\[|\]$/g, "");
-        }
-        break;
-      case "duration":
-        if (!result.duration && !trimmed.startsWith("#")) {
-          result.duration = trimmed.replace(/^\[|\]$/g, "");
-        }
-        break;
-      case "businessInference":
-        if (!result.businessInference && !trimmed.startsWith("#")) {
-          result.businessInference = trimmed.replace(/^\[|\]$/g, "");
-        }
-        break;
-      case "businessDetails":
-        if (((/^\*\*タイムスタンプ:\*\*/.test(trimmed) || /^\*\*timestamp:\*\*/i.test(trimmed)) && currentStep)) {
-          const raw = trimmed.replace(/^\*\*タイムスタンプ:\*\*\s*/, "").replace(/^\*\*timestamp:\*\*\s*/i, "");
-          const parsed = parseTimestampField(raw);
-          currentStep.stepTimestamp = raw;
-          if (parsed) {
-            currentStep.timeStartSec = parsed.start;
-            currentStep.timeEndSec = parsed.end;
-          }
-        } else if ((/^\*\*使用ツール:\*\*/.test(trimmed) || /^\*\*used tool:\*\*/i.test(trimmed)) && currentStep) {
-          currentStep.stepTool = trimmed.replace(/^\*\*使用ツール:\*\*\s*/, "");
-          currentStep.stepTool = currentStep.stepTool.replace(/^\*\*used tool:\*\*\s*/i, "");
-        } else if (trimmed.startsWith("- ") && currentStep) {
-          const raw = trimmed.substring(2);
-          // Parse leading [mm:ss] or [mm:ss–mm:ss]
-          const m = raw.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)(?:[–-](\d{1,2}:\d{2}(?::\d{2})?))?\]\s*(.*)$/);
-          if (m) {
-            const start = parseTimestampToSeconds(m[1]);
-            const end = m[2] ? parseTimestampToSeconds(m[2]) : null;
-            const time = start != null && end != null ? (start + end) / 2 : start != null ? start : null;
-            currentStep.operations.push({ text: m[3] || "", opTimestamp: m[0].slice(0, m[0].indexOf("]") + 1), opTimeSec: time ?? undefined });
-          } else {
-            currentStep.operations.push({ text: raw });
-          }
-        } else if ((/^\*\*業務推察:\*\*/.test(trimmed) || /^\*\*business inference:\*\*/i.test(trimmed)) && currentStep) {
-          currentStep.stepInference = trimmed.replace(/^\*\*業務推察:\*\*\s*/, "");
-          currentStep.stepInference = currentStep.stepInference.replace(/^\*\*business inference:\*\*\s*/i, "");
-        }
-        break;
-    }
-  }
-
-  // Save last step if exists
-  if (currentStep) {
-    result.businessDetails!.push(currentStep);
-  }
-
-  return result;
-}
+// parsing functions are imported from '@/lib/parse-content'
 
 export default function ParsedResult({
   source,
@@ -191,11 +22,37 @@ export default function ParsedResult({
   videoUrl?: string | null;
   videoDurationSec?: number | null;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const content = React.useMemo(() => parseMarkdownContent(source), [source]);
   const [thumbs, setThumbs] = React.useState<Record<string, string | null>>({});
   const [isCapturing, setIsCapturing] = React.useState(false);
   const [lightbox, setLightbox] = React.useState<{ src: string; alt: string } | null>(null);
+
+  const formatDurationLabel = (seconds: number): string => {
+    const sec = Math.max(0, Math.round(seconds));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return lang === "ja" ? `【所要時間${m}分${s}秒】` : `【Duration ${m}m ${s}s】`;
+  };
+
+  const stepDurationSec = (step: { timeStartSec?: number; timeEndSec?: number; operations: Array<{ opStartSec?: number; opEndSec?: number }> }): number | null => {
+    if (typeof step.timeStartSec === "number" && typeof step.timeEndSec === "number" && step.timeEndSec > step.timeStartSec) {
+      return step.timeEndSec - step.timeStartSec;
+    }
+    let minStart: number | null = null;
+    let maxEnd: number | null = null;
+    for (const op of step.operations) {
+      if (typeof op.opStartSec === "number") minStart = minStart == null ? op.opStartSec : Math.min(minStart, op.opStartSec);
+      if (typeof op.opEndSec === "number") maxEnd = maxEnd == null ? op.opEndSec : Math.max(maxEnd, op.opEndSec);
+    }
+    if (minStart != null && maxEnd != null && maxEnd > minStart) return maxEnd - minStart;
+    return null;
+  };
+
+  const opDurationSec = (op: { opStartSec?: number; opEndSec?: number }): number | null => {
+    if (typeof op.opStartSec === "number" && typeof op.opEndSec === "number" && op.opEndSec > op.opStartSec) return op.opEndSec - op.opStartSec;
+    return null;
+  };
 
   // no mount flag needed
 
@@ -218,14 +75,14 @@ export default function ParsedResult({
           v.addEventListener("loadedmetadata", onLoaded, { once: true });
           v.addEventListener("error", onError, { once: true });
         });
-        // High-quality capture: scale up to natural size with a sensible cap and devicePixelRatio
-        const maxW = 1280; // capture cap for width
+        // High-quality capture: increase cap and devicePixelRatio for sharper thumbs
+        const maxW = 1920; // capture cap for width (up from 1280)
         const natW = v.videoWidth || 1280;
         const natH = v.videoHeight || 720;
         const scaleTo = Math.min(1, maxW / natW);
         const W = Math.max(320, Math.round(natW * scaleTo));
         const H = Math.max(180, Math.round(natH * scaleTo));
-        const dpr = Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 2);
+        const dpr = Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 3);
         const canvas = document.createElement("canvas");
         canvas.width = Math.round(W * dpr);
         canvas.height = Math.round(H * dpr);
@@ -273,7 +130,7 @@ export default function ParsedResult({
             v.addEventListener("error", onErr, { once: true });
           });
           ctx.drawImage(v, 0, 0, W, H);
-          const url = canvas.toDataURL("image/webp", 0.92);
+          const url = canvas.toDataURL("image/webp", 0.97);
           if (!cancelled) setThumbs((prev) => ({ ...prev, [tgt.key]: url }));
         }
       } catch {
@@ -363,6 +220,7 @@ export default function ParsedResult({
               {content.duration && (
                 <div className="flex items-center gap-2">
                   <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  <span className="text-[11px] font-semibold text-muted-foreground">{t("duration")}</span>
                   <span className="text-xs text-muted-foreground">{content.duration}</span>
                 </div>
               )}
@@ -420,10 +278,10 @@ export default function ParsedResult({
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-12">No.</th>
-                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-56">{t("stepName")}</th>
-                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-96">{t("stepInference")}</th>
-                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-44">{t("usedTool")}</th>
-                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-96">{t("operations")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-48">{t("stepName")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-72">{t("stepInference")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-36">{t("usedTool")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-80">{t("operations")}</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-60">{t("screenshot")}</th>
                   </tr>
                 </thead>
@@ -444,9 +302,9 @@ export default function ParsedResult({
                             <div className="text-xs font-medium text-foreground leading-relaxed">
                               {step.stepName}
                             </div>
-                            {step.stepTimestamp && (
-                              <div className="text-[10px] text-muted-foreground mt-0.5">{step.stepTimestamp}</div>
-                            )}
+                            {(() => { const d = stepDurationSec(step); return d != null ? (
+                              <div className="text-[10px] text-muted-foreground mt-0.5">{formatDurationLabel(d)}</div>
+                            ) : null; })()}
                           </td>
                         )}
                         {oIdx === 0 && (
@@ -467,10 +325,10 @@ export default function ParsedResult({
                         {/* Operation text */}
                         <td className="p-3 align-top">
                           <div className="text-xs text-foreground leading-relaxed break-words">
-                            {op.opTimestamp && (
-                              <span className="inline-flex items-center text-[10px] px-1 py-[1px] rounded border border-border bg-muted/60 mr-1 align-middle">{op.opTimestamp}</span>
-                            )}
-                            <span>{op.text}</span>
+                            <div>{op.text}</div>
+                            {(() => { const d = opDurationSec(op); return d != null ? (
+                              <div className="text-[10px] text-muted-foreground mt-0.5">{formatDurationLabel(d)}</div>
+                            ) : null; })()}
                           </div>
                         </td>
 

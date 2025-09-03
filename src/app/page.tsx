@@ -3,6 +3,7 @@
 import * as React from "react";
 import ParsedResult from "@/components/parsed-result";
 import { NotebookPen } from "lucide-react";
+import ExportMenu from "@/components/ExportMenu";
 import { useUpload } from "@/components/upload-context";
 import { useI18n } from "@/components/i18n-context";
 
@@ -24,6 +25,7 @@ export default function Home() {
                 <div key={sf.id} className="rounded-xl bg-card p-4 mb-4">
                   <div className="flex items-center justify-between gap-3 text-sm font-semibold mb-4 pb-3 text-primary">
                     <span className="truncate">{sf.file.name}</span>
+                    <ExportMenu fileId={sf.id} />
                   </div>
                   {resultsById[sf.id] ? (
                     <ParsedResult

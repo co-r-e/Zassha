@@ -72,6 +72,7 @@ const en = {
   fetchError: "Failed to fetch results.",
   downloadWord: "Download Word",
   downloadExcel: "Download Excel",
+  export: "Export",
   errorOccurred: "An error occurred.",
   // Contact
   contactTitle: "Contact",
@@ -139,6 +140,7 @@ const ja = {
   fetchError: "結果の取得に失敗しました。",
   downloadWord: "Wordをダウンロード",
   downloadExcel: "Excelをダウンロード",
+  export: "エクスポート",
   errorOccurred: "エラーが発生しました。",
   // Contact
   contactTitle: "お問い合わせ",

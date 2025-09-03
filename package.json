@@ -17,6 +17,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "docx": "^8.6.0",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
     "@google/genai": "^1.13.0",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-switch": "^1.2.5",
