@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import NextImage from "next/image";
+import Lightbox from "@/components/ui/lightbox";
 import { Clock, Eye, List } from "lucide-react";
-import { useI18n, tCount } from "@/components/i18n-context";
+import { useI18n } from "@/components/i18n-context";
 
 type ParsedContent = {
   overview?: string;
@@ -10,9 +12,12 @@ type ParsedContent = {
   businessInference?: string;
   businessDetails?: Array<{
     stepName: string;
-    operations: string[];
+    operations: Array<{ text: string; opTimestamp?: string; opTimeSec?: number }>;
     stepTool?: string;
     stepInference?: string;
+    stepTimestamp?: string;
+    timeStartSec?: number;
+    timeEndSec?: number;
   }>;
 };
 
@@ -44,6 +49,41 @@ function parseTwoColTable(md: string): Array<{ task: string; detail: string }> {
   return rows;
 }
 
+function parseTimestampToSeconds(ts: string): number | null {
+  // supports mm:ss or hh:mm:ss
+  const parts = ts.split(":").map((p) => p.trim());
+  if (parts.some((p) => p === "" || /[^0-9]/.test(p))) return null;
+  let h = 0, m = 0, s = 0;
+  if (parts.length === 2) {
+    [m, s] = parts.map((x) => Number(x));
+  } else if (parts.length === 3) {
+    [h, m, s] = parts.map((x) => Number(x));
+  } else {
+    return null;
+  }
+  if ([h, m, s].some((n) => Number.isNaN(n))) return null;
+  return h * 3600 + m * 60 + s;
+}
+
+function parseTimestampField(raw: string): { start?: number; end?: number; label: string } | null {
+  // Accept formats like "00:45", "00:45–01:20" or "00:45-01:20"
+  const cleaned = raw.replace(/\s+/g, "");
+  const m = cleaned.split(/[–-]/);
+  if (m.length === 1) {
+    const t = parseTimestampToSeconds(m[0]);
+    if (t == null) return null;
+    return { start: t, label: raw.trim() };
+  }
+  if (m.length === 2) {
+    const a = parseTimestampToSeconds(m[0]);
+    const b = parseTimestampToSeconds(m[1]);
+    if (a == null || b == null) return null;
+    const [start, end] = a <= b ? [a, b] : [b, a];
+    return { start, end, label: raw.trim() };
+  }
+  return null;
+}
+
 function parseMarkdownContent(md: string): ParsedContent {
   const lines = md.split(/\r?\n/);
   const result: ParsedContent = {
@@ -51,7 +91,7 @@ function parseMarkdownContent(md: string): ParsedContent {
   };
 
   let currentSection = "";
-  let currentStep: { stepName: string; operations: string[]; stepInference?: string; stepTool?: string } | null = null;
+  let currentStep: { stepName: string; operations: Array<{ text: string; opTimestamp?: string; opTimeSec?: number }>; stepInference?: string; stepTool?: string; stepTimestamp?: string; timeStartSec?: number; timeEndSec?: number } | null = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -101,11 +141,29 @@ function parseMarkdownContent(md: string): ParsedContent {
         }
         break;
       case "businessDetails":
-        if ((/^\*\*使用ツール:\*\*/.test(trimmed) || /^\*\*used tool:\*\*/i.test(trimmed)) && currentStep) {
+        if (((/^\*\*タイムスタンプ:\*\*/.test(trimmed) || /^\*\*timestamp:\*\*/i.test(trimmed)) && currentStep)) {
+          const raw = trimmed.replace(/^\*\*タイムスタンプ:\*\*\s*/, "").replace(/^\*\*timestamp:\*\*\s*/i, "");
+          const parsed = parseTimestampField(raw);
+          currentStep.stepTimestamp = raw;
+          if (parsed) {
+            currentStep.timeStartSec = parsed.start;
+            currentStep.timeEndSec = parsed.end;
+          }
+        } else if ((/^\*\*使用ツール:\*\*/.test(trimmed) || /^\*\*used tool:\*\*/i.test(trimmed)) && currentStep) {
           currentStep.stepTool = trimmed.replace(/^\*\*使用ツール:\*\*\s*/, "");
           currentStep.stepTool = currentStep.stepTool.replace(/^\*\*used tool:\*\*\s*/i, "");
         } else if (trimmed.startsWith("- ") && currentStep) {
-          currentStep.operations.push(trimmed.substring(2));
+          const raw = trimmed.substring(2);
+          // Parse leading [mm:ss] or [mm:ss–mm:ss]
+          const m = raw.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)(?:[–-](\d{1,2}:\d{2}(?::\d{2})?))?\]\s*(.*)$/);
+          if (m) {
+            const start = parseTimestampToSeconds(m[1]);
+            const end = m[2] ? parseTimestampToSeconds(m[2]) : null;
+            const time = start != null && end != null ? (start + end) / 2 : start != null ? start : null;
+            currentStep.operations.push({ text: m[3] || "", opTimestamp: m[0].slice(0, m[0].indexOf("]") + 1), opTimeSec: time ?? undefined });
+          } else {
+            currentStep.operations.push({ text: raw });
+          }
         } else if ((/^\*\*業務推察:\*\*/.test(trimmed) || /^\*\*business inference:\*\*/i.test(trimmed)) && currentStep) {
           currentStep.stepInference = trimmed.replace(/^\*\*業務推察:\*\*\s*/, "");
           currentStep.stepInference = currentStep.stepInference.replace(/^\*\*business inference:\*\*\s*/i, "");
@@ -124,29 +182,120 @@ function parseMarkdownContent(md: string): ParsedContent {
 
 export default function ParsedResult({
   source,
-  tokens
+  tokens,
+  videoUrl,
+  videoDurationSec,
 }: {
   source: string;
   tokens?: { inputTokens: number; outputTokens: number; totalTokens: number } | null;
+  videoUrl?: string | null;
+  videoDurationSec?: number | null;
 }) {
-  const { t, lang } = useI18n();
-  const [expandedSteps, setExpandedSteps] = React.useState<Set<number>>(new Set());
-  const [isMounted, setIsMounted] = React.useState(false);
+  const { t } = useI18n();
   const content = React.useMemo(() => parseMarkdownContent(source), [source]);
+  const [thumbs, setThumbs] = React.useState<Record<string, string | null>>({});
+  const [isCapturing, setIsCapturing] = React.useState(false);
+  const [lightbox, setLightbox] = React.useState<{ src: string; alt: string } | null>(null);
 
+  // no mount flag needed
+
+  // Generate step thumbnails from the provided video URL (client-side)
   React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const toggleStep = (index: number) => {
-    const newExpanded = new Set(expandedSteps);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
-    } else {
-      newExpanded.add(index);
+    if (!videoUrl || !(content.businessDetails && content.businessDetails.length)) {
+      setThumbs({});
+      return;
     }
-    setExpandedSteps(newExpanded);
-  };
+    let cancelled = false;
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.src = videoUrl;
+    setIsCapturing(true);
+    const run = async () => {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const onLoaded = () => resolve();
+          const onError = () => reject(new Error("video load error"));
+          v.addEventListener("loadedmetadata", onLoaded, { once: true });
+          v.addEventListener("error", onError, { once: true });
+        });
+        // High-quality capture: scale up to natural size with a sensible cap and devicePixelRatio
+        const maxW = 1280; // capture cap for width
+        const natW = v.videoWidth || 1280;
+        const natH = v.videoHeight || 720;
+        const scaleTo = Math.min(1, maxW / natW);
+        const W = Math.max(320, Math.round(natW * scaleTo));
+        const H = Math.max(180, Math.round(natH * scaleTo));
+        const dpr = Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 2);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("no 2d context");
+        if (dpr !== 1) {
+          ctx.scale(dpr, dpr);
+        }
+
+        const dur = v.duration || videoDurationSec || 0;
+        const steps = content.businessDetails as NonNullable<typeof content.businessDetails>;
+        const targets: Array<{ key: string; time: number }> = [];
+        let globalIndex = 0;
+        for (let s = 0; s < steps.length; s++) {
+          const step = steps[s];
+          const nOps = step.operations.length || 1;
+          for (let o = 0; o < nOps; o++) {
+            const op = step.operations[o];
+            let t: number | null = null;
+            if (typeof op.opTimeSec === "number") {
+              t = op.opTimeSec;
+            } else if (typeof step.timeStartSec === "number" && typeof step.timeEndSec === "number" && step.timeEndSec > step.timeStartSec) {
+              const frac = (o + 1) / (nOps + 1);
+              t = step.timeStartSec + frac * (step.timeEndSec - step.timeStartSec);
+            } else if (typeof step.timeStartSec === "number") {
+              t = step.timeStartSec + o * 4; // 4s stride fallback
+            } else if (dur > 0) {
+              t = Math.max(0.1, Math.min(dur - 0.1, (dur * (globalIndex + 1)) / (steps.length * (nOps + 1))));
+            } else {
+              t = 0;
+            }
+            targets.push({ key: `${s}-${o}`, time: Math.max(0, t) });
+            globalIndex++;
+          }
+        }
+
+        for (const tgt of targets) {
+          if (cancelled) break;
+          await new Promise<void>((resolve, reject) => {
+            const onSeek = () => resolve();
+            const onErr = () => reject(new Error("seek error"));
+            v.removeEventListener("seeked", onSeek);
+            v.currentTime = Math.max(0, Math.min(dur || v.duration || 0, tgt.time));
+            v.addEventListener("seeked", onSeek, { once: true });
+            v.addEventListener("error", onErr, { once: true });
+          });
+          ctx.drawImage(v, 0, 0, W, H);
+          const url = canvas.toDataURL("image/webp", 0.92);
+          if (!cancelled) setThumbs((prev) => ({ ...prev, [tgt.key]: url }));
+        }
+      } catch {
+        // mark all as failed once
+        if (!cancelled) {
+          const N = content.businessDetails?.length || 0;
+          const failMap: Record<number, string | null> = {};
+          for (let i = 0; i < N; i++) failMap[i] = null;
+          setThumbs(failMap);
+        }
+      } finally {
+        setIsCapturing(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+      v.src = ""; // release
+    };
+  }, [videoUrl, videoDurationSec, content]);
+
+  // no row toggle; always show per-operation rows
 
   // If section parsing failed, try 2-col Markdown table (Business Task | Business Details)
   const tableRows = React.useMemo(() => parseTwoColTable(source), [source]);
@@ -267,86 +416,110 @@ export default function ParsedResult({
 
             {/* Table Layout */}
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1400px] border-collapse">
+              <table className="w-full min-w-[1600px] border-collapse">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-12">No.</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-56">{t("stepName")}</th>
-                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-44">{t("usedTool")}</th>
-                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-80">{t("operations")}</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-96">{t("stepInference")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-44">{t("usedTool")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-96">{t("operations")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-60">{t("screenshot")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {content.businessDetails.map((step, index) => (
-                    <tr
-                      key={index}
-                      className="border-b border-border hover:bg-muted/20 transition-colors cursor-pointer"
-                      onClick={() => toggleStep(index)}
-                      title={isMounted && expandedSteps.has(index) ? t("collapseHint") : t("expandHint")}
-                    >
-                      <td className="p-3 align-top">
-                        <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
-                          {index + 1}
-                        </div>
-                      </td>
-                      <td className="p-3 align-top">
-                        <div className="text-xs font-medium text-foreground leading-relaxed">
-                          {step.stepName}
-                        </div>
-                      </td>
-                      <td className="p-3 align-top">
-                        <div className="text-xs text-foreground leading-relaxed">
-                          {step.stepTool || t("unknown")}
-                        </div>
-                      </td>
-                      <td className="p-3 align-top">
-                        {isMounted && expandedSteps.has(index) ? (
-                          <div className="space-y-2">
-                            {step.operations.map((operation, opIndex) => (
-                              <div key={opIndex} className="flex items-start gap-2">
-                                <span className="text-primary mt-1 flex-shrink-0 text-xs">•</span>
-                                <span className="text-xs text-foreground leading-relaxed break-words">
-                                  {operation}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-xs text-foreground">
-                            {tCount(lang, "operationsCount", step.operations.length)}
-                          </div>
+                  {content.businessDetails.map((step, sIdx) => {
+                    const opCount = step.operations.length || 1;
+                    return step.operations.map((op, oIdx) => (
+                      <tr key={`${sIdx}-${oIdx}`} className="border-b border-border">
+                        {oIdx === 0 && (
+                          <td className="p-3 align-top" rowSpan={opCount}>
+                            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
+                              {sIdx + 1}
+                            </div>
+                          </td>
                         )}
-                      </td>
-                      <td className="p-3 align-top">
-                        <div className="text-xs text-foreground leading-relaxed">
-                          {step.stepInference || t("noInference")}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        {oIdx === 0 && (
+                          <td className="p-3 align-top" rowSpan={opCount}>
+                            <div className="text-xs font-medium text-foreground leading-relaxed">
+                              {step.stepName}
+                            </div>
+                            {step.stepTimestamp && (
+                              <div className="text-[10px] text-muted-foreground mt-0.5">{step.stepTimestamp}</div>
+                            )}
+                          </td>
+                        )}
+                        {oIdx === 0 && (
+                          <td className="p-3 align-top" rowSpan={opCount}>
+                            <div className="text-xs text-foreground leading-relaxed">
+                              {step.stepInference || t("noInference")}
+                            </div>
+                          </td>
+                        )}
+                        {oIdx === 0 && (
+                          <td className="p-3 align-top" rowSpan={opCount}>
+                            <div className="text-xs text-foreground leading-relaxed">
+                              {step.stepTool || t("unknown")}
+                            </div>
+                          </td>
+                        )}
+
+                        {/* Operation text */}
+                        <td className="p-3 align-top">
+                          <div className="text-xs text-foreground leading-relaxed break-words">
+                            {op.opTimestamp && (
+                              <span className="inline-flex items-center text-[10px] px-1 py-[1px] rounded border border-border bg-muted/60 mr-1 align-middle">{op.opTimestamp}</span>
+                            )}
+                            <span>{op.text}</span>
+                          </div>
+                        </td>
+
+                        {/* Screenshot column to the right of operation */}
+                        <td className="p-3 align-top">
+                          {videoUrl ? (
+                            <div className="relative w-[200px] h-[112px] rounded-md border border-border bg-card overflow-hidden">
+                              {thumbs[`${sIdx}-${oIdx}`] ? (
+                                (() => {
+                                  const src = thumbs[`${sIdx}-${oIdx}`] as string;
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => setLightbox({ src, alt: `${step.stepName} - ${op.text}` })}
+                                      className="block w-full h-full"
+                                      title={t("view")}
+                                    >
+                                      <NextImage src={src} alt={`${step.stepName} - ${op.text}`} width={200} height={112} className="w-full h-full object-cover" />
+                                    </button>
+                                  );
+                                })()
+                              ) : (
+                                <div className="w-full h-full grid place-items-center text-[10px] text-muted-foreground">
+                                  {isCapturing ? t("capturing") : t("captureFailed")}
+                                </div>
+                              )}
+                              {(op.opTimestamp || step.stepTimestamp) && (
+                                <div className="absolute left-1 top-1 text-[10px] bg-background/80 text-foreground rounded px-1 py-[1px] border border-border">
+                                  {op.opTimestamp || step.stepTimestamp}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                          <div className="text-[10px] text-muted-foreground">{t("noVideo")}</div>
+                          )}
+                        </td>
+
+                        {/* step inference moved next to step name */}
+                      </tr>
+                    ));
+                  })}
                 </tbody>
               </table>
             </div>
-
-            {/* Expand All / Collapse All Controls */}
-            <div className="flex justify-center gap-2 mt-4 pt-4">
-              <button
-                onClick={() => setExpandedSteps(new Set(content.businessDetails?.map((_, i) => i) || []))}
-                className="text-xs text-primary hover:text-primary/80 transition-colors px-3 py-1 rounded border border-primary/20 hover:bg-primary/10"
-              >
-                {t("expandAll")}
-              </button>
-              <button
-                onClick={() => setExpandedSteps(new Set())}
-                className="text-xs text-primary hover:text-primary/80 transition-colors px-3 py-1 rounded border border-primary/20 hover:bg-primary/10"
-              >
-                {t("collapseAll")}
-              </button>
-            </div>
+            {/* note: per-operation rows can be many; consider virtualizing in future */}
           </div>
         </div>
       )}
+      <Lightbox open={!!lightbox} src={lightbox?.src ?? null} alt={lightbox?.alt ?? ""} onClose={() => setLightbox(null)} />
     </div>
   );
 }

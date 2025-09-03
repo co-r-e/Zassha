@@ -7,7 +7,7 @@ import { useUpload } from "@/components/upload-context";
 import { useI18n } from "@/components/i18n-context";
 
 export default function Home() {
-  const { files, resultsById, tokensById } = useUpload();
+  const { files, resultsById, tokensById, previewUrlsById, videoMetaById } = useUpload();
   const { t } = useI18n();
 
   return (
@@ -26,7 +26,12 @@ export default function Home() {
                     <span className="truncate">{sf.file.name}</span>
                   </div>
                   {resultsById[sf.id] ? (
-                    <ParsedResult source={resultsById[sf.id]} tokens={tokensById[sf.id]} />
+                    <ParsedResult
+                      source={resultsById[sf.id]}
+                      tokens={tokensById[sf.id]}
+                      videoUrl={previewUrlsById[sf.id]}
+                      videoDurationSec={videoMetaById[sf.id]?.duration}
+                    />
                   ) : (
                     <div className="text-xs text-muted-foreground p-8 text-center border border-dashed border-border rounded-md bg-muted/20">
                       {t("willShowAfterAnalysis")}

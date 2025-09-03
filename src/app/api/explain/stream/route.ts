@@ -65,23 +65,25 @@ export async function POST(req: NextRequest) {
 [他の人が同じ作業を再現できるよう、以下の形式で詳細に記述]
 
 ### ステップ1: [ステップ名] 【所要時間xx分】
+**タイムスタンプ:** [動画上の該当箇所（例: 00:45 または 00:45–01:20）]
 **使用ツール:** [動画の内容から推察した具体的なツール名。例: Google Chrome / Excel / VS Code / Slack / Jira / GitHub / Terminal / Finder / Figma など製品名やSaaS名]
-- 具体的な操作1
-- 具体的な操作2
-- 具体的な操作3
+- [00:45] 具体的な操作1（操作冒頭に [mm:ss] または [hh:mm:ss]、範囲なら [mm:ss–mm:ss] を付与）
+- [00:55–01:10] 具体的な操作2
+- [01:12] 具体的な操作3
 
 **業務推察:** [このステップで作業者が何を確認・検証しようとしているかを推察]
 
 ### ステップ2: [ステップ名] 【所要時間xx分】
+**タイムスタンプ:** [動画上の該当箇所（例: 02:10 または 01:20–02:00）]
 **使用ツール:** [動画の内容から推察した具体的なツール名]
-- 具体的な操作1
-- 具体的な操作2
+- [02:10] 具体的な操作1
+- [02:25] 具体的な操作2
 
 **業務推察:** [このステップで作業者が何を確認・検証しようとしているかを推察]
 
 [必要に応じてステップを追加]
 
-業務詳細では、各ステップの所要時間を【所要時間xx分】の形式で記載し、各ステップで**使用ツール**を必ず明記し（できる限り具体的な製品名）、各ステップの後に**業務推察:**として作業者の意図を推察してください。操作詳細では、ボタン名、メニュー名、入力値、クリック位置、キーボード操作、画面遷移など、第三者が同じ作業を完全に再現できる粒度で記述してください。`;
+業務詳細では、各ステップの所要時間を【所要時間xx分】の形式で記載し、各ステップで**タイムスタンプ**（単一時刻または開始–終了の範囲）と**使用ツール**を明記し、各ステップの後に**業務推察:**として作業者の意図を推察してください。操作詳細では、ボタン名、メニュー名、入力値、クリック位置、キーボード操作、画面遷移など、第三者が同じ作業を完全に再現できる粒度で記述してください。`;
         const promptDetailEn = `You are an expert at analyzing screen recordings. Output in the following structure.
 
 LANGUAGE POLICY: Output only in English. If any on-screen text, UI labels, or speech are in Japanese or any non-English language, translate all content into natural English. Do not include non-English text unless essential for clarity.
@@ -101,23 +103,25 @@ Reference (optional): ${hint ? hint : "(none)"}
 [Describe so that others can reproduce the same work exactly]
 
 ### Step 1: [Step name] [Duration xx min]
+**Timestamp:** [Relevant time in the video (e.g., 00:45 or 00:45–01:20)]
 **Used Tool:** [Specific tool name inferred from the video, e.g., Google Chrome / Excel / VS Code / Slack / Jira / GitHub / Terminal / Finder / Figma]
-- Concrete operation 1
-- Concrete operation 2
-- Concrete operation 3
+- [00:45] Concrete operation 1 (prefix each operation with [mm:ss] or [hh:mm:ss], ranges like [mm:ss–mm:ss] allowed)
+- [00:55–01:10] Concrete operation 2
+- [01:12] Concrete operation 3
 
 **Business Inference:** [What the operator intends to check/verify in this step]
 
 ### Step 2: [Step name] [Duration xx min]
+**Timestamp:** [Relevant time in the video (e.g., 02:10 or 01:20–02:00)]
 **Used Tool:** [Specific tool name]
-- Concrete operation 1
-- Concrete operation 2
+- [02:10] Concrete operation 1
+- [02:25] Concrete operation 2
 
 **Business Inference:** [What the operator intends in this step]
 
 [Add more steps as needed]
 
-In Business Details, write each step's duration as [Duration xx min], always include **Used Tool** (use specific product names when possible), and add **Business Inference:** after each step. For operations, include button/menu names, input values, click targets, keyboard actions, screen transitions, etc., at a granularity that allows exact reproduction.`;
+In Business Details, write each step's duration as [Duration xx min], always include a **Timestamp** (single time or start–end range) and **Used Tool** (use specific product names when possible), and add **Business Inference:** after each step. For operations, include button/menu names, input values, click targets, keyboard actions, screen transitions, etc., at a granularity that allows exact reproduction.`;
         const promptSummaryJa = `あなたは動画解析の専門家です。以下の構造で簡潔に出力してください（全体で500〜800字程度）：
 
 参考情報（任意）: ${hint ? hint : "(特になし)"}
