@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import NextImage from "next/image";
+// import NextImage from "next/image";
 import Lightbox from "@/components/ui/lightbox";
 import { Clock, Eye, List } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { parseMarkdownContent, parseTwoColTable } from "@/lib/parse-content";
+import SegmentPlayer from "@/components/SegmentPlayer";
+import VideoLightbox from "@/components/ui/video-lightbox";
 
 // type imports are handled in parse-content users as needed
 
@@ -27,6 +29,7 @@ export default function ParsedResult({
   const [thumbs, setThumbs] = React.useState<Record<string, string | null>>({});
   const [isCapturing, setIsCapturing] = React.useState(false);
   const [lightbox, setLightbox] = React.useState<{ src: string; alt: string } | null>(null);
+  const [videoBox, setVideoBox] = React.useState<{ src: string; start: number; end: number; poster?: string; label?: string } | null>(null);
 
   const formatDurationLabel = (seconds: number): string => {
     const sec = Math.max(0, Math.round(seconds));
@@ -332,37 +335,51 @@ export default function ParsedResult({
                           </div>
                         </td>
 
-                        {/* Screenshot column to the right of operation */}
+                        {/* Screenshot/Segment column to the right of operation */}
                         <td className="p-3 align-top">
                           {videoUrl ? (
-                            <div className="relative w-[200px] h-[112px] rounded-md border border-border bg-card overflow-hidden">
-                              {thumbs[`${sIdx}-${oIdx}`] ? (
-                                (() => {
-                                  const src = thumbs[`${sIdx}-${oIdx}`] as string;
-                                  return (
-                                    <button
-                                      type="button"
-                                      onClick={() => setLightbox({ src, alt: `${step.stepName} - ${op.text}` })}
-                                      className="block w-full h-full"
-                                      title={t("view")}
-                                    >
-                                      <NextImage src={src} alt={`${step.stepName} - ${op.text}`} width={200} height={112} className="w-full h-full object-cover" />
-                                    </button>
-                                  );
-                                })()
-                              ) : (
-                                <div className="w-full h-full grid place-items-center text-[10px] text-muted-foreground">
-                                  {isCapturing ? t("capturing") : t("captureFailed")}
+                            (() => {
+                              // compute segment [start,end]
+                              let start: number | null = null;
+                              let end: number | null = null;
+                              if (typeof op.opStartSec === "number" && typeof op.opEndSec === "number" && op.opEndSec > op.opStartSec) {
+                                start = op.opStartSec; end = op.opEndSec;
+                              } else if (typeof step.timeStartSec === "number" && typeof step.timeEndSec === "number" && step.timeEndSec > step.timeStartSec) {
+                                const center = step.timeStartSec + ((oIdx + 1) / (opCount + 1)) * (step.timeEndSec - step.timeStartSec);
+                                start = Math.max(step.timeStartSec, center - 2);
+                                end = Math.min(step.timeEndSec, center + 2);
+                              } else if (typeof (op as { opTimeSec?: number }).opTimeSec === "number") {
+                                const c = (op as { opTimeSec?: number }).opTimeSec as number;
+                                start = Math.max(0, c - 2);
+                                end = c + 2;
+                              } else if (typeof videoDurationSec === "number" && videoDurationSec > 0) {
+                                const c = ((oIdx + 1) / (opCount + 1)) * videoDurationSec;
+                                start = Math.max(0, c - 2);
+                                end = Math.min(videoDurationSec, c + 2);
+                              }
+                              if (start == null || end == null || end <= start) {
+                                return (
+                                  <div className="relative w-[200px] h-[112px] rounded-md border border-border bg-card overflow-hidden grid place-items-center text-[10px] text-muted-foreground">
+                                    {thumbs[`${sIdx}-${oIdx}`] ? t("view") : (isCapturing ? t("capturing") : t("captureFailed"))}
+                                  </div>
+                                );
+                              }
+                          return (
+                                <div onClick={() => setVideoBox({ src: videoUrl!, start, end, poster: thumbs[`${sIdx}-${oIdx}`] || undefined, label: op.opTimestamp || step.stepTimestamp })} className="cursor-zoom-in">
+                                  <SegmentPlayer
+                                    src={videoUrl}
+                                    start={start}
+                                    end={end}
+                                    poster={thumbs[`${sIdx}-${oIdx}`] || undefined}
+                                    width={200}
+                                    height={112}
+                                    label={op.opTimestamp || step.stepTimestamp}
+                                  />
                                 </div>
-                              )}
-                              {(op.opTimestamp || step.stepTimestamp) && (
-                                <div className="absolute left-1 top-1 text-[10px] bg-background/80 text-foreground rounded px-1 py-[1px] border border-border">
-                                  {op.opTimestamp || step.stepTimestamp}
-                                </div>
-                              )}
-                            </div>
+                              );
+                          })()
                           ) : (
-                          <div className="text-[10px] text-muted-foreground">{t("noVideo")}</div>
+                            <div className="text-[10px] text-muted-foreground">{t("noVideo")}</div>
                           )}
                         </td>
 
@@ -378,6 +395,15 @@ export default function ParsedResult({
         </div>
       )}
       <Lightbox open={!!lightbox} src={lightbox?.src ?? null} alt={lightbox?.alt ?? ""} onClose={() => setLightbox(null)} />
+      <VideoLightbox
+        open={!!videoBox}
+        src={videoBox?.src ?? null}
+        start={videoBox?.start ?? 0}
+        end={videoBox?.end ?? 0}
+        poster={videoBox?.poster ?? null}
+        label={videoBox?.label ?? null}
+        onClose={() => setVideoBox(null)}
+      />
     </div>
   );
 }
