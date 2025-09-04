@@ -6,7 +6,17 @@
   <b>English</b> · <a href="./README.ja.md">日本語</a>
 </p>
 
-ZASSHA is a Next.js app for analyzing videos and producing structured, reproducible task descriptions. It supports local uploads and server-side processing (Gemini Files API).
+ZASSHA is a Next.js app that analyzes screen recordings and produces structured, reproducible task descriptions. It supports local uploads and server‑side processing (Gemini Files API), and can export results to Word and Excel.
+
+## Features
+
+- Video analysis to structured steps (Overview, Business Inference, Business Details)
+- Per‑operation screenshots (captured locally in the browser)
+- Clean table view with per‑operation rows and inline thumbnails
+- Export per file to Word (.docx) and Excel (.xlsx)
+  - Word: visual headings, image first then text, localized (EN/JA)
+  - Excel: styled header, autofilter, zebra striping, wrapped text
+- Light/dark theme, EN/JA toggle
 
 ## Quick Start (No Build)
 
@@ -29,10 +39,18 @@ Open http://localhost:3000.
 
 ## Dependencies
 - Node.js: see `.nvmrc` or `package.json#engines`.
+- Key runtime deps: `@google/genai`, `docx`, `exceljs`
 
 ## Scripts
-- `npm start` (or `npm run dev`): Run the app with Turbopack
-- `npm run lint`: Lint with ESLint
+- `npm start` (or `npm run dev`): Run with Turbopack
+- `npm run lint`: ESLint
+- `npm run typecheck`: TypeScript checks
+
+## Usage tips
+
+- Upload one or more videos in the sidebar, choose Summary or Detail, add an optional hint, then click Analyze.
+- Each analyzed file renders as a card. The Export button is in the card header (right side) and exports only that file.
+- Word/Excel filenames follow: `zassha_<original-name>_<YYYYMMDD>.*`.
 
 ## Contributing
 - See CONTRIBUTING.md for workflow and PR checklist.
@@ -44,4 +62,4 @@ Open http://localhost:3000.
 - Security reports: https://co-r-e.net/contact (see SECURITY.md)
 
 ## License
-MIT — see LICENSE.
+MIT — see LICENSE. © 2025 CORe Inc.
