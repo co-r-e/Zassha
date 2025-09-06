@@ -17,10 +17,10 @@ export type DocxLabels = {
 };
 
 export async function buildDocxSingle(file: ExportFile, images?: ImageMap, labels?: DocxLabels): Promise<Blob> {
-  const docx = await import("docx");
+  const docx: typeof import("docx") = await import("docx");
   const { Document, Packer, Paragraph, HeadingLevel, ImageRun } = docx;
 
-  const children: unknown[] = [];
+  const children: any[] = [];
   const f = file;
   // Title (visual heading)
   children.push(new Paragraph({ text: f.fileName, heading: HeadingLevel.TITLE }));
@@ -70,7 +70,8 @@ export async function buildDocxSingle(file: ExportFile, images?: ImageMap, label
           children.push(new Paragraph({
             children: [
               new ImageRun({
-                data: img.data,
+                type: "jpg",
+                data: img.data instanceof Uint8Array ? img.data : new Uint8Array(img.data),
                 transformation: {
                   width: Math.round(Math.min(960, img.width) / 2),
                   height: Math.round((Math.min(960, img.width) / 2) * (img.height / img.width)),

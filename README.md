@@ -75,11 +75,12 @@ Open http://localhost:3000.
 
 ## Environment
 - Required secret: `GEMINI_API_KEY` (set in `.env.local`).
-- Optional: `ZASSHA_SEGMENT_LEN`, `ZASSHA_CHUNK_THRESHOLD_BYTES`, `ZASSHA_CHUNK_SIZE_BYTES`.
+- Optional: `NEXT_PUBLIC_SITE_URL` (absolute base URL for OG/Twitter), `ZASSHA_SEGMENT_LEN`, `ZASSHA_CHUNK_THRESHOLD_BYTES`, `ZASSHA_CHUNK_SIZE_BYTES`.
 - Example:
 ```bash
 cp .env.example .env.local
 echo GEMINI_API_KEY=sk-... >> .env.local
+# echo NEXT_PUBLIC_SITE_URL=https://zassha.example.com >> .env.local
 ```
 
 ## Coding Style & Conventions

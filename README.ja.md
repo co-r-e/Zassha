@@ -74,10 +74,11 @@ npm start
 
 ## 環境変数
 - 必須: `GEMINI_API_KEY`（`.env.local` に設定）。
-- 任意: `ZASSHA_SEGMENT_LEN`, `ZASSHA_CHUNK_THRESHOLD_BYTES`, `ZASSHA_CHUNK_SIZE_BYTES`。
+- 任意: `NEXT_PUBLIC_SITE_URL`（OG/Twitter の絶対URLの基点）, `ZASSHA_SEGMENT_LEN`, `ZASSHA_CHUNK_THRESHOLD_BYTES`, `ZASSHA_CHUNK_SIZE_BYTES`。
 ```bash
 cp .env.example .env.local
 echo GEMINI_API_KEY=sk-... >> .env.local
+# echo NEXT_PUBLIC_SITE_URL=https://zassha.example.com >> .env.local
 ```
 
 ## コーディング規約・慣習
