@@ -246,7 +246,7 @@ export default function ParsedResult({
             {/* Overview with Duration */}
             <div>
               <div className="text-[11px] font-semibold text-muted-foreground mb-1">{t("overview")}</div>
-              <div className="text-xs text-foreground leading-relaxed mb-2">
+              <div className="text-[14px] text-foreground leading-relaxed mb-2">
                 {content.overview || t("noOverview")}
               </div>
               {content.duration && (
@@ -264,7 +264,7 @@ export default function ParsedResult({
                 <Eye className="h-3 w-3 text-primary" />
                 <span className="text-[11px] font-semibold text-muted-foreground">{t("businessInference")}</span>
               </div>
-              <div className="text-xs text-foreground leading-relaxed">
+              <div className="text-[14px] text-foreground leading-relaxed">
                 {content.businessInference || t("noInference")}
               </div>
             </div>
@@ -332,7 +332,7 @@ export default function ParsedResult({
                         )}
                         {oIdx === 0 && (
                           <td className="p-3 align-top" rowSpan={opCount}>
-                            <div className="text-xs font-medium text-foreground leading-relaxed">
+                            <div className="text-[14px] font-medium text-foreground leading-relaxed">
                               {step.stepName}
                             </div>
                             {(() => { const d = stepDurationSec(step); return d != null ? (
@@ -342,14 +342,14 @@ export default function ParsedResult({
                         )}
                         {oIdx === 0 && (
                           <td className="p-3 align-top" rowSpan={opCount}>
-                            <div className="text-xs text-foreground leading-relaxed">
+                            <div className="text-[14px] text-foreground leading-relaxed">
                               {step.stepInference || t("noInference")}
                             </div>
                           </td>
                         )}
                         {oIdx === 0 && (
                           <td className="p-3 align-top" rowSpan={opCount}>
-                            <div className="text-xs text-foreground leading-relaxed">
+                            <div className="text-[14px] text-foreground leading-relaxed">
                               {step.stepTool || t("unknown")}
                             </div>
                           </td>
@@ -357,7 +357,7 @@ export default function ParsedResult({
 
                         {/* Operation text */}
                         <td className="p-3 align-top">
-                          <div className="text-xs text-foreground leading-relaxed break-words">
+                          <div className="text-[14px] text-foreground leading-relaxed break-words">
                             <div>{op.text}</div>
                             <div className="text-[10px] text-muted-foreground mt-0.5">{formatDurationLabel(opDurationSec(op as { opStartSec?: number; opEndSec?: number; opTimeSec?: number }, oIdx, step as { timeStartSec?: number; timeEndSec?: number; operations: Array<{ opStartSec?: number; opEndSec?: number; opTimeSec?: number }> }))}</div>
                           </div>

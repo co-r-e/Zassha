@@ -20,7 +20,7 @@ export async function buildDocxSingle(file: ExportFile, images?: ImageMap, label
   const docx: typeof import("docx") = await import("docx");
   const { Document, Packer, Paragraph, HeadingLevel, ImageRun } = docx;
 
-  const children: any[] = [];
+  const children: import("docx").FileChild[] = [];
   const f = file;
   // Title (visual heading)
   children.push(new Paragraph({ text: f.fileName, heading: HeadingLevel.TITLE }));
@@ -92,7 +92,22 @@ export async function buildDocxSingle(file: ExportFile, images?: ImageMap, label
     }
   }
 
-  const doc = new Document({ sections: [{ children }] });
+  const defaultRunFont = { font: { ascii: "Yu Gothic UI", hAnsi: "Yu Gothic UI", eastAsia: "Yu Gothic UI" } } as const;
+  const doc = new Document({
+    styles: {
+      default: {
+        document: { run: defaultRunFont },
+        title: { run: defaultRunFont },
+        heading1: { run: defaultRunFont },
+        heading2: { run: defaultRunFont },
+        heading3: { run: defaultRunFont },
+        heading4: { run: defaultRunFont },
+        heading5: { run: defaultRunFont },
+        heading6: { run: defaultRunFont },
+      },
+    },
+    sections: [{ children }],
+  });
   const blob = await Packer.toBlob(doc);
   return blob;
 
