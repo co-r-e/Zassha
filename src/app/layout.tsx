@@ -17,12 +17,41 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
-  title: "ZASSHA",
-  description: "Explain video content as text",
-  icons: {
-    icon: "/favicon.svg",
+  title: {
+    default: "ZASSHA — Analyze Screen Recordings into Reproducible Steps",
+    template: "%s — ZASSHA",
   },
+  description:
+    "ZASSHA turns screen recordings into structured, reproducible workflows with per‑operation screenshots and Word/Excel export. Runs locally and via the Gemini Files API.",
+  metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: "/",
+    languages: { en: "/", ja: "/ja" },
+  },
+  openGraph: {
+    title: "ZASSHA — Analyze Screen Recordings into Reproducible Steps",
+    description:
+      "ZASSHA turns screen recordings into structured, reproducible workflows with per‑operation screenshots and Word/Excel export.",
+    type: "website",
+    images: [
+      { url: "/opengraph-image", width: 1200, height: 630, alt: "ZASSHA — Analyze Screen Recordings into Reproducible Steps" },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ZASSHA — Analyze Screen Recordings into Reproducible Steps",
+    description:
+      "ZASSHA turns screen recordings into structured, reproducible workflows.",
+    images: [
+      { url: "/twitter-image", width: 1200, height: 630, alt: "ZASSHA — Analyze Screen Recordings into Reproducible Steps" },
+    ],
+  },
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

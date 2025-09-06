@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import ParsedResult from "@/components/parsed-result";
+import EmptyLanding from "@/components/EmptyLanding";
 import { NotebookPen } from "lucide-react";
 import ExportMenu from "@/components/ExportMenu";
 import { useUpload } from "@/components/upload-context";
@@ -14,20 +15,23 @@ export default function Home() {
   return (
     <div className="min-h-dvh">
       <div className="p-0 h-full">
-        <div className="flex items-center gap-2 p-2 mb-2">
-          <NotebookPen className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold leading-none">{t("analysisResult")}</h2>
-        </div>
         {files.length > 0 ? (
-          <div className="space-y-4 overflow-x-auto">
+          <>
+            <div className="flex items-center gap-2 p-2 mb-2">
+              <NotebookPen className="h-4 w-4 text-primary" />
+              <h2 className="font-semibold leading-none">{t("analysisResult")}</h2>
+            </div>
+            <div className="space-y-4 overflow-x-auto">
             <div className="min-w-[900px] pr-4 px-2 pb-6">
-              {files.map((sf) => (
+              {files.map((sf) => {
+                const hasResult = Object.prototype.hasOwnProperty.call(resultsById, sf.id);
+                return (
                 <div key={sf.id} className="rounded-xl bg-card p-4 mb-4">
                   <div className="flex items-center justify-between gap-3 text-sm font-semibold mb-4 pb-3 text-primary">
                     <span className="truncate">{sf.file.name}</span>
                     <ExportMenu fileId={sf.id} />
                   </div>
-                  {resultsById[sf.id] ? (
+                  {hasResult ? (
                     <ParsedResult
                       source={resultsById[sf.id]}
                       tokens={tokensById[sf.id]}
@@ -40,10 +44,15 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-              ))}
+              );})}
             </div>
+            </div>
+          </>
+        ) : (
+          <div className="px-2 pb-6">
+            <EmptyLanding />
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );

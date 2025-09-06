@@ -118,7 +118,15 @@ export default function SidebarUploader() {
         </div>
 
         {/* per-file progress shown above in the file list */}
-        {error && <div className="text-[11px] text-destructive text-center">{t("errorPrefix")}: {error}</div>}
+        {error && (
+          <div className="text-[11px] text-destructive text-center">
+            {(() => {
+              const e = String(error);
+              const keyMissing = e.includes("GEMINI_API_KEY is not set") || (/GEMINI/.test(e) && /API_KEY|key/i.test(e));
+              return keyMissing ? t("apiKeyMissing") : `${t("errorPrefix")}: ${e}`;
+            })()}
+          </div>
+        )}
 
         <Button
           type="button"

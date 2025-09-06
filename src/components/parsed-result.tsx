@@ -52,9 +52,38 @@ export default function ParsedResult({
     return null;
   };
 
-  const opDurationSec = (op: { opStartSec?: number; opEndSec?: number }): number | null => {
-    if (typeof op.opStartSec === "number" && typeof op.opEndSec === "number" && op.opEndSec > op.opStartSec) return op.opEndSec - op.opStartSec;
-    return null;
+  const opDurationSec = (
+    op: { opStartSec?: number; opEndSec?: number; opTimeSec?: number },
+    oIdx: number,
+    step: { timeStartSec?: number; timeEndSec?: number; operations: Array<{ opStartSec?: number; opEndSec?: number; opTimeSec?: number }> }
+  ): number => {
+    // 1) Explicit range
+    if (typeof op.opStartSec === "number" && typeof op.opEndSec === "number" && op.opEndSec > op.opStartSec) {
+      return Math.max(1, op.opEndSec - op.opStartSec);
+    }
+    const nOps = Math.max(1, step.operations.length);
+    const stepHasRange = typeof step.timeStartSec === "number" && typeof step.timeEndSec === "number" && step.timeEndSec! > step.timeStartSec!;
+    // 2) From current → next operation time
+    if (typeof op.opTimeSec === "number") {
+      // find next op with time
+      for (let i = oIdx + 1; i < nOps; i++) {
+        const nxt = step.operations[i];
+        if (typeof nxt.opTimeSec === "number" && nxt.opTimeSec! > op.opTimeSec!) {
+          return Math.max(1, nxt.opTimeSec! - op.opTimeSec!);
+        }
+      }
+      // last op with time and step has end → until step end
+      if (stepHasRange) {
+        return Math.max(1, (step.timeEndSec! - op.opTimeSec!));
+      }
+    }
+    // 3) Even split within step range
+    if (stepHasRange) {
+      const len = step.timeEndSec! - step.timeStartSec!;
+      return Math.max(1, len / nOps);
+    }
+    // 4) Fallback default (preview uses ±2s → 約4秒)
+    return 4;
   };
 
   // no mount flag needed
@@ -277,6 +306,7 @@ export default function ParsedResult({
 
             {/* Table Layout */}
             <div className="overflow-x-auto">
+              {(() => { const seenSegments = new Set<string>(); return (
               <table className="w-full min-w-[1600px] border-collapse">
                 <thead>
                   <tr className="border-b border-border">
@@ -285,7 +315,7 @@ export default function ParsedResult({
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-72">{t("stepInference")}</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-36">{t("usedTool")}</th>
                     <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-80">{t("operations")}</th>
-                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-60">{t("screenshot")}</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-60">{t("operationVideo")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -329,9 +359,7 @@ export default function ParsedResult({
                         <td className="p-3 align-top">
                           <div className="text-xs text-foreground leading-relaxed break-words">
                             <div>{op.text}</div>
-                            {(() => { const d = opDurationSec(op); return d != null ? (
-                              <div className="text-[10px] text-muted-foreground mt-0.5">{formatDurationLabel(d)}</div>
-                            ) : null; })()}
+                            <div className="text-[10px] text-muted-foreground mt-0.5">{formatDurationLabel(opDurationSec(op as { opStartSec?: number; opEndSec?: number; opTimeSec?: number }, oIdx, step as { timeStartSec?: number; timeEndSec?: number; operations: Array<{ opStartSec?: number; opEndSec?: number; opTimeSec?: number }> }))}</div>
                           </div>
                         </td>
 
@@ -364,7 +392,14 @@ export default function ParsedResult({
                                   </div>
                                 );
                               }
-                          return (
+                              const segKey = `${videoUrl}|${start.toFixed(2)}-${end.toFixed(2)}`;
+                              if (seenSegments.has(segKey)) {
+                                return (
+                                  <div className="w-[200px] h-[112px] grid place-items-center text-xs text-muted-foreground">-</div>
+                                );
+                              }
+                              seenSegments.add(segKey);
+                              return (
                                 <div onClick={() => setVideoBox({ src: videoUrl!, start, end, poster: thumbs[`${sIdx}-${oIdx}`] || undefined, label: op.opTimestamp || step.stepTimestamp })} className="cursor-zoom-in">
                                   <SegmentPlayer
                                     src={videoUrl}
@@ -389,6 +424,7 @@ export default function ParsedResult({
                   })}
                 </tbody>
               </table>
+              ); })()}
             </div>
             {/* note: per-operation rows can be many; consider virtualizing in future */}
           </div>

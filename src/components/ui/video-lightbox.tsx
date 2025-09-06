@@ -21,7 +21,7 @@ export default function VideoLightbox({
   label?: string | null;
 }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [isPlaying, setIsPlaying] = React.useState(true);
   const [muted, setMuted] = React.useState(true);
   const [volume, setVolume] = React.useState(0.6);
   const [progress, setProgress] = React.useState(0); // 0..1 within [start,end]
@@ -46,9 +46,13 @@ export default function VideoLightbox({
       try {
         v.currentTime = Math.max(0, start);
         v.volume = volume;
-        v.muted = muted;
-        // do not auto-play; wait for explicit user action
-        setIsPlaying(!v.paused && !v.ended);
+        v.muted = true; // enforce muted for autoplay
+        try {
+          await v.play();
+          setIsPlaying(true);
+        } catch {
+          setIsPlaying(false);
+        }
       } catch {}
     };
     const onPlay = () => setIsPlaying(true);
@@ -152,6 +156,7 @@ export default function VideoLightbox({
           src={src}
           muted={muted}
           playsInline
+          autoPlay
           poster={poster || undefined}
           className="absolute inset-0 w-full h-full object-contain bg-black"
         />
