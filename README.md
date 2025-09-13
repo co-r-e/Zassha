@@ -3,6 +3,14 @@
 </p>
 
 <p align="center">
+  <a href="https://youtu.be/gZmPmaNJeR0" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.youtube.com/vi/gZmPmaNJeR0/hqdefault.jpg" alt="ZASSHA Demo Video" width="640" style="border-radius:8px" />
+  </a>
+  <br />
+  <sub>Click to watch the 3‑minute demo on YouTube</sub>
+</p>
+
+<p align="center">
   <b>English</b> · <a href="./README.ja.md">日本語</a>
 </p>
 
@@ -11,6 +19,8 @@ ZASSHA turns your screen recordings into clear, reproducible steps you can share
 — This README focuses on everyday use. A short developer note is at the end.
 
 ## Quick Start (5 minutes)
+
+> First run tip: start with a short recording (≤ 5 minutes, ~100 MB). It keeps upload/analysis fast while you validate the flow.
 
 1) Install dependencies
 ```bash
@@ -58,6 +68,16 @@ Then open http://localhost:3000 in your browser.
 
 7) Switch language and theme
 - Footer: EN/JA toggle; light/dark theme toggle.
+
+## Record Your Screen (macOS / Windows)
+
+- macOS (built‑in)
+  - Shortcut: press `Shift + Command + 5` → choose “Record Entire Screen” or “Record Selected Portion” → click Record. Stop from the menu bar Stop button (or `Command + Control + Esc`). The default save location is Desktop unless changed in Options.
+  - QuickTime Player: open QuickTime → File → New Screen Recording → choose mic if needed → click Record. Stop from the menu bar.
+
+- Windows (built‑in)
+  - Xbox Game Bar: press `Win + G` to open, then `Win + Alt + R` to start/stop recording. Files are saved under `Videos/Captures` by default.
+  - Snipping Tool (Windows 11): open Snipping Tool → switch to the Record tab → New → select the area → Start. When done, stop and save the file.
 
 ## Tips For Better Results
 - Keep the recording focused on the task; avoid rapid app switching.

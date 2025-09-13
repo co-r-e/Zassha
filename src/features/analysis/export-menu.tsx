@@ -3,14 +3,14 @@
 import * as React from "react";
 import { useUpload } from "@/components/upload-context";
 import { useI18n } from "@/components/i18n-context";
-import { buildDocxSingle, buildXlsxSingle, buildPptxSingle, buildYamlSingle, makeDocLabels, type ImageMap } from "@/lib/exporters";
+import { buildDocxSingle, buildXlsxSingle, buildPptxSingle, makeDocLabels, type ImageMap } from "@/lib/exporters";
 import { parseMarkdownContent } from "@/lib/parse-content";
 
 export default function ExportMenu({ fileId }: { fileId: string }) {
   const { t, lang } = useI18n();
   const { files, resultsById, previewUrlsById, videoMetaById } = useUpload();
   const [open, setOpen] = React.useState(false);
-  const [busy, setBusy] = React.useState<"" | "word" | "excel" | "pptx" | "yaml">("");
+  const [busy, setBusy] = React.useState<"" | "word" | "excel" | "pptx">("");
   const ref = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
@@ -25,7 +25,7 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
   const file = files.find((f) => f.id === fileId) || null;
   const isReady = !!(file && resultsById[fileId]);
 
-  async function handle(type: "word" | "excel" | "pptx" | "yaml") {
+  async function handle(type: "word" | "excel" | "pptx") {
     try {
       setBusy(type);
       if (!file || !isReady) return;
@@ -40,11 +40,7 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
         triggerDownload(`zassha_${safeBase}_${today}.xlsx`, blob);
         return;
       }
-      if (type === "yaml") {
-        const blob = await buildYamlSingle({ fileName: file.file.name, content });
-        triggerDownload(`zassha_${safeBase}_${today}.yaml`, blob);
-        return;
-      }
+      
 
       const videoUrl = previewUrlsById[fileId];
       const dur = videoMetaById[fileId]?.duration || 0;
@@ -185,14 +181,7 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
           >
             {busy === "excel" ? "…" : t("downloadExcel")}
           </button>
-          <button
-            type="button"
-            className="w-full text-left px-3 py-2 text-[12px] hover:bg-muted disabled:opacity-60"
-            onClick={() => void handle("yaml")}
-            disabled={!!busy}
-          >
-            {busy === "yaml" ? "…" : t("downloadYaml")}
-          </button>
+          
         </div>
       )}
     </div>
