@@ -84,6 +84,7 @@ const en = {
   downloadWord: "Download Word",
   downloadPptx: "Download PowerPoint",
   downloadExcel: "Download Excel",
+  downloadYaml: "Download YAML",
   export: "Export",
   errorOccurred: "An error occurred.",
   // Contact
@@ -164,6 +165,7 @@ const ja = {
   downloadWord: "Wordをダウンロード",
   downloadPptx: "PowerPointをダウンロード",
   downloadExcel: "Excelをダウンロード",
+  downloadYaml: "YAMLをダウンロード",
   export: "エクスポート",
   errorOccurred: "エラーが発生しました。",
   // Contact

@@ -390,3 +390,97 @@ function arrayBufferToDataUrlJPEG(ab: ArrayBuffer): string {
     return `data:image/jpeg;base64,${base64}`;
   }
 }
+
+// --- YAML ---
+export async function buildYamlSingle(file: ExportFile): Promise<Blob> {
+  // Remove undefined fields recursively for cleaner YAML
+  const clean = (v: unknown): unknown => {
+    if (v == null) return v;
+    if (Array.isArray(v)) return v.map((x) => clean(x));
+    if (typeof v === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+        if (val === undefined) continue;
+        out[k] = clean(val);
+      }
+      return out;
+    }
+    return v;
+  };
+
+  const payload = clean({
+    fileName: file.fileName,
+    overview: file.content.overview || undefined,
+    duration: file.content.duration || undefined,
+    businessInference: file.content.businessInference || undefined,
+    businessDetails: (file.content.businessDetails || []).map((s) => ({
+      stepName: s.stepName,
+      stepTool: s.stepTool || undefined,
+      stepInference: s.stepInference || undefined,
+      stepTimestamp: s.stepTimestamp || undefined,
+      timeStartSec: s.timeStartSec,
+      timeEndSec: s.timeEndSec,
+      operations: (s.operations || []).map((op) => ({
+        text: op.text,
+        opTimestamp: op.opTimestamp || undefined,
+        opTimeSec: op.opTimeSec,
+        opStartSec: op.opStartSec,
+        opEndSec: op.opEndSec,
+      })),
+    })),
+  });
+
+  const yaml = yamlStringify(payload, 0);
+  return new Blob([yaml], { type: "text/yaml;charset=utf-8" });
+}
+
+function yamlStringify(value: unknown, indent: number): string {
+  const pad = (n: number) => " ".repeat(n);
+
+  const strScalar = (s: string): string => {
+    if (s.includes("\n")) {
+      const lines = s.split(/\n/);
+      return `|\n${lines.map((l) => pad(indent + 2) + l).join("\n")}`;
+    }
+    // Quote if contains special chars or leading/trailing spaces
+    if (/^\s|\s$|[:\-?\[\]{},#&*!|>'\"%@`]/.test(s)) {
+      return JSON.stringify(s);
+    }
+    return s;
+  };
+
+  const scalar = (v: unknown): string => {
+    if (v === null) return "null";
+    switch (typeof v) {
+      case "string":
+        return strScalar(v);
+      case "number":
+        return Number.isFinite(v) ? String(v) : "null";
+      case "boolean":
+        return v ? "true" : "false";
+      default:
+        return "";
+    }
+  };
+
+  if (value == null || typeof value !== "object") return scalar(value);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    return value
+      .map((item) => `${pad(indent)}- ${yamlStringify(item, indent + 2).replace(/^\s+/, "")}`)
+      .join("\n");
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) return "{}";
+  return entries
+    .map(([k, v]) => {
+      const key = /^[A-Za-z_][A-Za-z0-9_]*$/.test(k) ? k : JSON.stringify(k);
+      if (v == null || typeof v !== "object") {
+        return `${pad(indent)}${key}: ${scalar(v)}`;
+      }
+      const child = yamlStringify(v, indent + 2);
+      const isMultiline = /\n/.test(child);
+      return `${pad(indent)}${key}:${isMultiline ? "\n" + child : " " + child}`;
+    })
+    .join("\n");
+}
