@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "GEMINI_API_KEY is not set" }), { status: 500 });
   }
+
+  // Model configuration from environment variables with defaults
+  const modelName = process.env.GEMINI_MODEL || "gemini-3-pro-preview";
+  const maxOutputTokens = parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || "4000", 10);
   const fd = await req.formData();
   const file = fd.get("file");
   const uploadId = (fd.get("uploadId") as string | null) || null;
@@ -78,9 +82,9 @@ export async function POST(req: NextRequest) {
             : (lang === "ja" ? `${segPrefixJa}${base.detail.ja}` : `${segPrefixEn}${base.detail.en}`);
 
           const g = await ai.models.generateContentStream({
-            model: "gemini-2.5-flash-lite",
+            model: modelName,
             contents: [{ role: "user", parts: [{ text: segPrompt }, { fileData: { mimeType: latest.mimeType!, fileUri: latest.uri! } }] }],
-            config: { temperature: 0.4, maxOutputTokens: 4000 },
+            config: { maxOutputTokens, thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } },
           });
           for await (const chunk of g as AsyncIterable<{ text?: string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } }>) {
             const t = chunk.text ?? undefined;
