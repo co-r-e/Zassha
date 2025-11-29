@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
             : (lang === "ja" ? `${segPrefixJa}${base.detail.ja}` : `${segPrefixEn}${base.detail.en}`);
 
           const g = await ai.models.generateContentStream({
-            model: "gemini-2.5-flash-lite",
+            model: "gemini-3-pro-preview",
             contents: [{ role: "user", parts: [{ text: segPrompt }, { fileData: { mimeType: latest.mimeType!, fileUri: latest.uri! } }] }],
             config: { temperature: 0.4, maxOutputTokens: 4000 },
           });

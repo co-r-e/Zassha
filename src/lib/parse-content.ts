@@ -171,6 +171,33 @@ export function parseMarkdownContent(md: string): ParsedContent {
   }
 
   if (currentStep) result.businessDetails!.push(currentStep);
+
+  // --- Fallbacks for new model formats (Gemini 3 Pro preview outputs may omit headings) ---
+  // 1) If no overview was extracted, use the first non-heading non-empty line as a lightweight summary.
+  if (!result.overview) {
+    const firstText = lines
+      .map((l) => l.trim())
+      .find((l) => l && !l.startsWith("#"));
+    if (firstText) result.overview = firstText;
+  }
+
+  // 2) If no business details were extracted, try to build a simple step from bullet/numbered lists.
+  if (!result.businessDetails || result.businessDetails.length === 0) {
+    const bullets = lines
+      .map((l) => l.trim())
+      .filter((l) => /^[-*+]\s+/.test(l) || /^\d+\.\s+/.test(l))
+      .map((l) => l.replace(/^[-*+]\s+/, "").replace(/^\d+\.\s+/, ""))
+      .filter((l) => l.length > 0);
+    if (bullets.length) {
+      result.businessDetails = [
+        {
+          stepName: "Auto Step",
+          operations: bullets.map((text) => ({ text })),
+        },
+      ];
+    }
+  }
+
   return result;
 }
 

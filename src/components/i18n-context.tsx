@@ -9,7 +9,10 @@ type I18nContextValue = {
   lang: Lang;
   setLang: (l: Lang) => void;
   toggleLang: () => void;
-  t: (key: keyof typeof en) => string;
+  t: <K extends keyof typeof en>(
+    key: K,
+    ...args: typeof en[K] extends (...args: infer P) => unknown ? P : []
+  ) => string;
 };
 
 const I18nContext = React.createContext<I18nContextValue | null>(null);
@@ -223,10 +226,10 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
         router.push(qs ? `${nextPath}?${qs}` : nextPath);
       }
     },
-    t: ((key: keyof Dict) => {
+    t: ((key: keyof Dict, ...args: unknown[]) => {
       const d = lang === "ja" ? ja : en;
       const val = d[key];
-      if (typeof val === "function") return (val as unknown as (n: number) => string)(0);
+      if (typeof val === "function") return (val as (...fnArgs: unknown[]) => string)(...args);
       return val as string;
     }) as I18nContextValue["t"],
   };
