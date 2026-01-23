@@ -15,6 +15,103 @@ function send(controller: ReadableStreamDefaultController, evt: StreamEvent) {
   controller.enqueue(new TextEncoder().encode(JSON.stringify(evt) + "\n"));
 }
 
+type NormalizedError = { code: string; message: string };
+
+function tryParseJson(input: string): unknown {
+  try {
+    return JSON.parse(input);
+  } catch {}
+  const start = input.indexOf("{");
+  const end = input.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try {
+      return JSON.parse(input.slice(start, end + 1));
+    } catch {}
+  }
+  return null;
+}
+
+function extractRetryAfterSec(details: unknown, message: string): number | null {
+  const fromMessage = message.match(/retry in\s*([0-9.]+)\s*s/i);
+  if (fromMessage && fromMessage[1]) {
+    const sec = Number.parseFloat(fromMessage[1]);
+    if (Number.isFinite(sec)) return Math.max(1, Math.ceil(sec));
+  }
+  if (Array.isArray(details)) {
+    for (const d of details) {
+      if (!d || typeof d !== "object") continue;
+      const obj = d as { ["@type"]?: unknown; retryDelay?: unknown };
+      if (typeof obj.retryDelay === "string") {
+        const m = obj.retryDelay.match(/([0-9.]+)s/);
+        if (m && m[1]) {
+          const sec = Number.parseFloat(m[1]);
+          if (Number.isFinite(sec)) return Math.max(1, Math.ceil(sec));
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function normalizeGeminiError(err: unknown, lang: "ja" | "en"): NormalizedError {
+  const raw = err instanceof Error ? err.message : String(err);
+  const parsed = tryParseJson(raw);
+  const top = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  const errObj = top && typeof top.error === "object" && top.error !== null ? (top.error as Record<string, unknown>) : top;
+  const status = errObj?.status;
+  const code = errObj?.code;
+  const codeNum = typeof code === "number" ? code : Number.parseInt(String(code), 10);
+  const message = typeof errObj?.message === "string" ? errObj.message : raw;
+  const details = errObj?.details;
+  const retryAfterSec = extractRetryAfterSec(details, message);
+  const lower = message.toLowerCase();
+  const isQuota = status === "RESOURCE_EXHAUSTED"
+    || codeNum === 429
+    || lower.includes("quota")
+    || lower.includes("rate limit")
+    || lower.includes("too many requests")
+    || lower.includes("resource_exhausted");
+
+  if (isQuota) {
+    const retryText = retryAfterSec
+      ? (lang === "ja" ? `約${retryAfterSec}秒待って再試行してください。` : `Please wait about ${retryAfterSec}s and try again.`)
+      : (lang === "ja" ? "しばらく待って再試行してください。" : "Please wait a bit and try again.");
+    const freeTierHint = /free[_ ]?tier|FreeTier|limit:\s*0/i.test(message)
+      ? (lang === "ja" ? "無料枠では利用できないモデルの可能性があります。" : "This model may not be available on the free tier.")
+      : "";
+    const tail = lang === "ja"
+      ? "プラン/課金状況を確認するか、リクエスト量を減らしてください。"
+      : "Check your plan/billing or reduce requests.";
+    return {
+      code: "GEMINI_QUOTA_EXCEEDED",
+      message: [lang === "ja" ? "Gemini API のクォータ上限に達しました。" : "Gemini API quota exceeded.", retryText, tail, freeTierHint].filter(Boolean).join(" "),
+    };
+  }
+
+  if (message.includes("Timed out waiting for ACTIVE")) {
+    return {
+      code: "GEMINI_FILE_TIMEOUT",
+      message: lang === "ja"
+        ? "ファイル処理の待機がタイムアウトしました。しばらく待って再試行してください。"
+        : "Timed out while waiting for the file to become active. Please try again later.",
+    };
+  }
+
+  if (message.includes("File processing failed")) {
+    return {
+      code: "GEMINI_FILE_FAILED",
+      message: lang === "ja"
+        ? "ファイル処理に失敗しました。形式や内容を変えて再試行してください。"
+        : "File processing failed. Please try a different file or retry later.",
+    };
+  }
+
+  const fallback = lang === "ja"
+    ? "処理に失敗しました。時間をおいて再試行してください。"
+    : "Processing failed. Please try again later.";
+  return { code: "INTERNAL", message: fallback };
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -59,7 +156,10 @@ export async function POST(req: NextRequest) {
         let prevSummary = "";
         for (let i = 0; i < segments.length; i++) {
           send(controller, { kind: "progress", phase: "generate", progress: 60 + Math.round((i / Math.max(1, segments.length)) * 35), message: `segment ${i + 1}/${segments.length}`, segmentIndex: i, segmentTotal: segments.length } as ProgressEvent);
-          const upload = await ai.files.upload({ file: await toNodeFile(segments[i], `${path.basename(localPath!)}.seg${i}${path.extname(localPath!)}`) });
+          const segPath = segments[i];
+          const segExt = path.extname(segPath) || path.extname(localPath!) || ".mp4";
+          const segName = `${path.basename(localPath!, path.extname(localPath!))}.seg${i}${segExt}`;
+          const upload = await ai.files.upload({ file: await toNodeFile(segPath, segName) });
           // wait ACTIVE
           const name = upload.name!;
           let latest = upload;
@@ -78,7 +178,7 @@ export async function POST(req: NextRequest) {
             : (lang === "ja" ? `${segPrefixJa}${base.detail.ja}` : `${segPrefixEn}${base.detail.en}`);
 
           const g = await ai.models.generateContentStream({
-            model: "gemini-3-pro-preview",
+            model: "gemini-3-flash-preview",
             contents: [{ role: "user", parts: [{ text: segPrompt }, { fileData: { mimeType: latest.mimeType!, fileUri: latest.uri! } }] }],
             config: { temperature: 0.4, maxOutputTokens: 4000 },
           });
@@ -103,9 +203,9 @@ export async function POST(req: NextRequest) {
         } : null } as DoneEvent);
         controller.close();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "internal error";
-        const code = msg.includes("GEMINI_API_KEY") ? "GEMINI_API_KEY_MISSING" : "INTERNAL";
-        send(controller, { kind: "error", phase: "error", progress: UPLOAD_PROGRESS_MAX, error: { code, message: msg } } as ErrorEvent);
+        const normalized = normalizeGeminiError(err, lang);
+        console.error("[explain/stream] error", err);
+        send(controller, { kind: "error", phase: "error", progress: UPLOAD_PROGRESS_MAX, error: normalized } as ErrorEvent);
         controller.close();
       }
     },
@@ -123,7 +223,27 @@ export async function POST(req: NextRequest) {
 async function toNodeFile(p: string, name: string) {
   const buf = await fs.readFile(p);
   // Node 18+ has File in global
-  return new File([new Uint8Array(buf)], name, { type: "video/mp4" });
+  return new File([new Uint8Array(buf)], name, { type: guessVideoMime(name) });
+}
+
+function guessVideoMime(name: string): string {
+  const ext = path.extname(name).toLowerCase();
+  switch (ext) {
+    case ".mov":
+      return "video/quicktime";
+    case ".webm":
+      return "video/webm";
+    case ".mkv":
+      return "video/x-matroska";
+    case ".avi":
+      return "video/x-msvideo";
+    case ".m4v":
+      return "video/x-m4v";
+    case ".mp4":
+      return "video/mp4";
+    default:
+      return "video/mp4";
+  }
 }
 
 async function segmentVideo(inputPath: string, segmentLenSec: number): Promise<string[]> {

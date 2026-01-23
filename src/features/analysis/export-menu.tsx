@@ -106,6 +106,29 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return images;
 
+    const seekTo = (time: number) => new Promise<void>((resolve, reject) => {
+      const maxDur = videoDuration || v.duration || 0;
+      const target = Math.max(0, Math.min(maxDur, time));
+      if (Math.abs(v.currentTime - target) < 0.01) {
+        resolve();
+        return;
+      }
+      let done = false;
+      const cleanup = () => {
+        if (done) return;
+        done = true;
+        v.removeEventListener("seeked", onSeek);
+        v.removeEventListener("error", onErr);
+        clearTimeout(timer);
+      };
+      const onSeek = () => { cleanup(); resolve(); };
+      const onErr = () => { cleanup(); reject(new Error("media error")); };
+      const timer = window.setTimeout(() => { cleanup(); resolve(); }, 2000);
+      v.addEventListener("seeked", onSeek, { once: true });
+      v.addEventListener("error", onErr, { once: true });
+      v.currentTime = target;
+    });
+
     const steps = content.businessDetails || [];
     for (let s = 0; s < steps.length; s++) {
       const step = steps[s];
@@ -122,8 +145,7 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
         if (t == null && spanStart != null) t = spanStart + o * 4;
         if (t == null && videoDuration > 0) t = Math.max(0.1, Math.min(videoDuration - 0.1, (videoDuration * (o + 1)) / (ops.length + 1)));
         if (t == null) t = 0;
-        v.currentTime = t;
-        await once(v, "seeked");
+        await seekTo(t);
         ctx.drawImage(v, 0, 0, targetW, targetH);
         const blob: Blob = await new Promise((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.95));
         const buf = await blob.arrayBuffer();

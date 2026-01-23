@@ -33,6 +33,16 @@ function opDurationSecHelper(
   return 4;
 }
 
+function clampRangeToDuration(
+  range: { start: number; end: number },
+  videoDur?: number | null
+): { start: number; end: number } {
+  if (typeof videoDur !== "number" || videoDur <= 0) return range;
+  const start = Math.max(0, Math.min(range.start, videoDur));
+  const end = Math.max(start, Math.min(range.end, videoDur));
+  return { start, end };
+}
+
 function opStartEndHelper(
   op: { opStartSec?: number; opEndSec?: number; opTimeSec?: number },
   oIdx: number,
@@ -41,25 +51,37 @@ function opStartEndHelper(
   videoDur?: number | null
 ): { start: number | null; end: number | null } {
   if (typeof op.opStartSec === "number" && typeof op.opEndSec === "number" && op.opEndSec > op.opStartSec) {
-    return { start: op.opStartSec, end: op.opEndSec };
+    return clampRangeToDuration({ start: op.opStartSec, end: op.opEndSec }, videoDur);
   }
   const dur = Math.max(1, opDurationSecHelper(op, oIdx, step));
   if (typeof op.opTimeSec === "number") {
-    const start = Math.max(0, op.opTimeSec);
-    const end = Math.min(typeof videoDur === "number" ? videoDur : start + dur, start + dur);
-    return end > start ? { start, end } : { start, end: start + 1 };
+    const rawStart = Math.max(0, op.opTimeSec);
+    const start = (typeof videoDur === "number" && videoDur > 0)
+      ? Math.min(rawStart, Math.max(0, videoDur - 0.001))
+      : rawStart;
+    const end = start + dur;
+    const clamped = clampRangeToDuration({ start, end }, videoDur);
+    const fallbackEnd = (typeof videoDur === "number" && videoDur > 0)
+      ? Math.min(videoDur, clamped.start + 1)
+      : clamped.start + 1;
+    return clamped.end > clamped.start ? clamped : { start: clamped.start, end: fallbackEnd };
   }
   if (typeof step.timeStartSec === "number" && typeof step.timeEndSec === "number" && step.timeEndSec > step.timeStartSec) {
     const len = step.timeEndSec - step.timeStartSec;
     const start = step.timeStartSec + (oIdx / Math.max(1, totalOps)) * len;
     const end = Math.min(step.timeEndSec, start + dur);
-    return end > start ? { start, end } : { start, end: Math.min(step.timeEndSec, start + 1) };
+    const clamped = clampRangeToDuration({ start, end }, videoDur);
+    const fallbackEnd = (typeof videoDur === "number" && videoDur > 0)
+      ? Math.min(videoDur, clamped.start + 1)
+      : clamped.start + 1;
+    return clamped.end > clamped.start ? clamped : { start: clamped.start, end: fallbackEnd };
   }
   if (typeof videoDur === "number" && videoDur > 0) {
     const c = ((oIdx + 1) / (Math.max(1, totalOps) + 1)) * videoDur;
     const start = Math.max(0, Math.min(c, Math.max(0, videoDur - dur)));
     const end = Math.min(videoDur, start + dur);
-    return end > start ? { start, end } : { start, end: Math.min(videoDur, start + 1) };
+    const clamped = clampRangeToDuration({ start, end }, videoDur);
+    return clamped.end > clamped.start ? clamped : { start: clamped.start, end: Math.min(videoDur, clamped.start + 1) };
   }
   return { start: null, end: null };
 }
@@ -187,16 +209,32 @@ export default function ParsedResult({
           }
         }
 
+        const seekTo = (time: number) => new Promise<void>((resolve, reject) => {
+          const maxDur = dur || v.duration || 0;
+          const target = Math.max(0, Math.min(maxDur, time));
+          if (Math.abs(v.currentTime - target) < 0.01) {
+            resolve();
+            return;
+          }
+          let done = false;
+          const cleanup = () => {
+            if (done) return;
+            done = true;
+            v.removeEventListener("seeked", onSeek);
+            v.removeEventListener("error", onErr);
+            clearTimeout(timer);
+          };
+          const onSeek = () => { cleanup(); resolve(); };
+          const onErr = () => { cleanup(); reject(new Error("seek error")); };
+          const timer = window.setTimeout(() => { cleanup(); resolve(); }, 2000);
+          v.addEventListener("seeked", onSeek, { once: true });
+          v.addEventListener("error", onErr, { once: true });
+          v.currentTime = target;
+        });
+
         for (const tgt of targets) {
           if (cancelled) break;
-          await new Promise<void>((resolve, reject) => {
-            const onSeek = () => resolve();
-            const onErr = () => reject(new Error("seek error"));
-            v.removeEventListener("seeked", onSeek);
-            v.currentTime = Math.max(0, Math.min(dur || v.duration || 0, tgt.time));
-            v.addEventListener("seeked", onSeek, { once: true });
-            v.addEventListener("error", onErr, { once: true });
-          });
+          await seekTo(tgt.time);
           ctx.drawImage(v, 0, 0, W, H);
           const url = canvas.toDataURL("image/webp", 0.97);
           if (!cancelled) setThumbs((prev) => ({ ...prev, [tgt.key]: url }));

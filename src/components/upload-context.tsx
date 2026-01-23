@@ -159,6 +159,45 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         let full = "";
         let tokens: Tokens = null;
         let buffer = ""; // NDJSON バッファ（チャンク跨ぎ対策）
+        const handleLine = (line: string) => {
+          if (!line.trim()) return;
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(line);
+          } catch {
+            // 解析失敗は黙ってスキップ（次の行で回復）
+            return;
+          }
+          const mk = parsed as { kind?: unknown };
+          if (mk && typeof mk.kind === "string") {
+            const evt = parsed as StreamEvent;
+            switch (evt.kind) {
+              case "progress":
+                if (typeof evt.progress === "number") setProgressById((prev) => ({ ...prev, [sf.id]: Math.max(20, Math.min(100, evt.progress)) }));
+                break;
+              case "delta":
+                if (typeof evt.progress === "number") setProgressById((prev) => ({ ...prev, [sf.id]: Math.max(20, Math.min(100, evt.progress)) }));
+                if ((evt as { delta?: string }).delta) full += (evt as { delta?: string }).delta as string;
+                break;
+              case "done":
+                setProgressById((prev) => ({ ...prev, [sf.id]: 100 }));
+                if (typeof evt.text === "string" && evt.text.length > 0) {
+                  full = evt.text; // サーバー側の最終テキストで上書き
+                }
+                if (evt.tokens !== undefined) tokens = evt.tokens as Tokens;
+                break;
+              case "error":
+                throw new Error(((evt as unknown) as { error?: { message?: string } })?.error?.message || "processing error");
+            }
+          } else {
+            const evt = parsed as { progress?: number; delta?: string; text?: string; tokens?: Tokens; error?: string };
+            if (typeof evt.progress === "number") setProgressById((prev) => ({ ...prev, [sf.id]: Math.max(20, Math.min(100, evt.progress!)) }));
+            if (typeof evt.delta === "string") full += evt.delta;
+            if (typeof evt.text === "string" && evt.text.length > 0) full = evt.text;
+            if (evt.tokens !== undefined) tokens = evt.tokens as Tokens;
+            if (typeof evt.error === "string") throw new Error(evt.error);
+          }
+        };
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
@@ -168,58 +207,19 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             if (nl === -1) break; // 行が閉じていない
             const line = buffer.slice(0, nl);
             buffer = buffer.slice(nl + 1);
-            if (!line.trim()) continue;
-            try {
-              const parsed: unknown = JSON.parse(line);
-              const mk = parsed as { kind?: unknown };
-              if (mk && typeof mk.kind === "string") {
-                const evt = parsed as StreamEvent;
-                switch (evt.kind) {
-                  case "progress":
-                    if (typeof evt.progress === "number") setProgressById((prev) => ({ ...prev, [sf.id]: Math.max(20, Math.min(100, evt.progress)) }));
-                    break;
-                  case "delta":
-                    if (typeof evt.progress === "number") setProgressById((prev) => ({ ...prev, [sf.id]: Math.max(20, Math.min(100, evt.progress)) }));
-                    if ((evt as { delta?: string }).delta) full += (evt as { delta?: string }).delta as string;
-                    break;
-                  case "done":
-                    setProgressById((prev) => ({ ...prev, [sf.id]: 100 }));
-                    if (typeof evt.text === "string" && evt.text.length > 0) {
-                      full = evt.text; // サーバー側の最終テキストで上書き
-                    }
-                    if (evt.tokens !== undefined) tokens = evt.tokens as Tokens;
-                    break;
-                  case "error":
-                    throw new Error(((evt as unknown) as { error?: { message?: string } })?.error?.message || "processing error");
-                }
-              } else {
-                const evt = parsed as { progress?: number; delta?: string; text?: string; tokens?: Tokens; error?: string };
-                if (typeof evt.progress === "number") setProgressById((prev) => ({ ...prev, [sf.id]: Math.max(20, Math.min(100, evt.progress!)) }));
-                if (typeof evt.delta === "string") full += evt.delta;
-                if (typeof evt.text === "string" && evt.text.length > 0) full = evt.text;
-                if (evt.tokens !== undefined) tokens = evt.tokens as Tokens;
-                if (typeof evt.error === "string") throw new Error(evt.error);
-              }
-            } catch {
-              // 解析失敗は黙ってスキップ（次の行で回復）
-            }
+            handleLine(line);
           }
         }
-        // 残りのバッファを最終処理（末尾に改行が付かないケース）
-        if (buffer.trim()) {
-          try {
-            const parsed: unknown = JSON.parse(buffer.trim());
-            const mk = parsed as { kind?: unknown };
-            if (mk && typeof mk.kind === "string") {
-              const evt = parsed as StreamEvent;
-              if (evt.kind === "delta" && (evt as { delta?: string }).delta) full += (evt as { delta?: string }).delta as string;
-              if (evt.kind === "done") {
-                if (typeof evt.text === "string" && evt.text.length > 0) full = evt.text;
-                if (evt.tokens !== undefined) tokens = evt.tokens as Tokens;
-              }
-            }
-          } catch {}
+        // flush decoder and process remaining lines
+        buffer += decoder.decode();
+        while (true) {
+          const nl = buffer.indexOf("\n");
+          if (nl === -1) break;
+          const line = buffer.slice(0, nl);
+          buffer = buffer.slice(nl + 1);
+          handleLine(line);
         }
+        if (buffer.trim()) handleLine(buffer.trim());
         setResultsById((prev) => ({ ...prev, [sf.id]: full }));
         setTokensById((prev) => ({ ...prev, [sf.id]: tokens }));
         setProgressById((prev) => ({ ...prev, [sf.id]: 100 }));
