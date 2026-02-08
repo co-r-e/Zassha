@@ -8,24 +8,45 @@ export const dynamic = "force-dynamic";
 
 const BASE = path.join(os.tmpdir(), "zassha_uploads");
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   const fd = await req.formData();
   const uploadId = (fd.get("uploadId") as string) || "";
-  if (!uploadId) return Response.json({ error: "bad request" }, { status: 400 });
+
+  if (!uploadId || !UUID_RE.test(uploadId)) {
+    return Response.json({ error: "bad request" }, { status: 400 });
+  }
+
   const dir = path.join(BASE, uploadId);
   const manPath = path.join(dir, "manifest.json");
+
   try {
-    const manifest = JSON.parse(await fs.readFile(manPath, "utf8")) as { nextIndex: number; chunkSize: number; size: number; fileName: string };
-    const written = (manifest.nextIndex * manifest.chunkSize);
-    if (written < manifest.size) return Response.json({ error: "incomplete" }, { status: 409 });
+    const manifest = JSON.parse(await fs.readFile(manPath, "utf8")) as {
+      nextIndex: number;
+      chunkSize: number;
+      size: number;
+      fileName: string;
+    };
+
+    const written = manifest.nextIndex * manifest.chunkSize;
+    if (written < manifest.size) {
+      return Response.json({ error: "incomplete" }, { status: 409 });
+    }
+
     const partPath = path.join(dir, "file.part");
     const ext = path.extname(manifest.fileName) || ".mp4";
     const finalPath = path.join(dir, "final" + ext);
-    await fs.rename(partPath, finalPath).catch(async () => {
+
+    try {
+      await fs.rename(partPath, finalPath);
+    } catch {
+      // rename may fail across mount boundaries; fall back to copy + delete
       const data = await fs.readFile(partPath);
       await fs.writeFile(finalPath, data);
       await fs.unlink(partPath).catch(() => {});
-    });
+    }
+
     return Response.json({ ok: true, uploadId, fileName: manifest.fileName });
   } catch {
     return Response.json({ error: "not found" }, { status: 404 });

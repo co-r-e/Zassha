@@ -32,7 +32,7 @@ export function parseTwoColTable(md: string): Array<{ task: string; detail: stri
   });
   if (headerIdx < 0) return [];
   const rows: Array<{ task: string; detail: string }> = [];
-  for (let i = headerIdx + 1; i < lines.length; i++) {
+  for (let i = headerIdx + 2; i < lines.length; i++) {
     const L = lines[i];
     if (!L.includes("|")) {
       if (rows.length > 0) break;
@@ -95,24 +95,26 @@ export function parseMarkdownContent(md: string): ParsedContent {
     timeEndSec?: number;
   } | null = null;
 
+  const sectionMap: Array<{ test: (h: string) => boolean; section: string }> = [
+    { test: (h) => h.startsWith("概要") || h.toLowerCase().startsWith("overview"), section: "overview" },
+    { test: (h) => h.startsWith("所要時間") || h.toLowerCase().startsWith("duration"), section: "duration" },
+    { test: (h) => h.startsWith("解説") || h.toLowerCase().startsWith("business inference"), section: "businessInference" },
+    { test: (h) => h.startsWith("業務詳細") || h.toLowerCase().startsWith("business details"), section: "businessDetails" },
+  ];
+
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed.startsWith("## 概要") || trimmed.toLowerCase().startsWith("## overview")) {
-      currentSection = "overview";
-      continue;
-    } else if (trimmed.startsWith("## 所要時間") || trimmed.toLowerCase().startsWith("## duration")) {
-      currentSection = "duration";
-      continue;
-    } else if (
-      trimmed.startsWith("## 解説") ||
-      trimmed.toLowerCase().startsWith("## business inference")
-    ) {
-      currentSection = "businessInference";
-      continue;
-    } else if (trimmed.startsWith("## 業務詳細") || trimmed.toLowerCase().startsWith("## business details")) {
-      currentSection = "businessDetails";
-      continue;
-    } else if (trimmed.startsWith("### ")) {
+
+    if (trimmed.startsWith("## ") && !trimmed.startsWith("### ")) {
+      const heading = trimmed.slice(3);
+      const matched = sectionMap.find((s) => s.test(heading));
+      if (matched) {
+        currentSection = matched.section;
+        continue;
+      }
+    }
+
+    if (trimmed.startsWith("### ")) {
       if (currentStep) result.businessDetails!.push(currentStep);
       const rawTitle = trimmed
         .replace(/^### /, "")
@@ -135,18 +137,24 @@ export function parseMarkdownContent(md: string): ParsedContent {
       case "businessInference":
         if (!result.businessInference && !trimmed.startsWith("#")) result.businessInference = trimmed.replace(/^\[|\]$/g, "");
         break;
-      case "businessDetails":
-        if (((/^\*\*タイムスタンプ:\*\*/.test(trimmed) || /^\*\*timestamp:\*\*/i.test(trimmed)) && currentStep)) {
-          const raw = trimmed.replace(/^\*\*タイムスタンプ:\*\*\s*/, "").replace(/^\*\*timestamp:\*\*\s*/i, "");
+      case "businessDetails": {
+        const isTimestamp = /^\*\*(タイムスタンプ|timestamp):\*\*/i.test(trimmed);
+        const isTool = /^\*\*(使用ツール|used tool):\*\*/i.test(trimmed);
+
+        if (isTimestamp && currentStep) {
+          const raw = trimmed
+            .replace(/^\*\*タイムスタンプ:\*\*\s*/, "")
+            .replace(/^\*\*timestamp:\*\*\s*/i, "");
           const parsed = parseTimestampField(raw);
           currentStep.stepTimestamp = raw;
           if (parsed) {
             currentStep.timeStartSec = parsed.start;
             currentStep.timeEndSec = parsed.end;
           }
-        } else if ((/^\*\*使用ツール:\*\*/.test(trimmed) || /^\*\*used tool:\*\*/i.test(trimmed)) && currentStep) {
-          currentStep.stepTool = trimmed.replace(/^\*\*使用ツール:\*\*\s*/, "");
-          currentStep.stepTool = currentStep.stepTool.replace(/^\*\*used tool:\*\*\s*/i, "");
+        } else if (isTool && currentStep) {
+          currentStep.stepTool = trimmed
+            .replace(/^\*\*使用ツール:\*\*\s*/, "")
+            .replace(/^\*\*used tool:\*\*\s*/i, "");
         } else if (trimmed.startsWith("- ") && currentStep) {
           const raw = trimmed.substring(2);
           const m = raw.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)(?:[–-](\d{1,2}:\d{2}(?::\d{2})?))?\]\s*(.*)$/);
@@ -161,12 +169,13 @@ export function parseMarkdownContent(md: string): ParsedContent {
           } else {
             currentStep.operations.push({ text: raw });
           }
-        } else if ((/^\*\*解説:\*\*/.test(trimmed) || /^\*\*business inference:\*\*/i.test(trimmed)) && currentStep) {
+        } else if (/^\*\*(解説|business inference):\*\*/i.test(trimmed) && currentStep) {
           currentStep.stepInference = trimmed
             .replace(/^\*\*解説:\*\*\s*/, "")
             .replace(/^\*\*business inference:\*\*\s*/i, "");
         }
         break;
+      }
     }
   }
 

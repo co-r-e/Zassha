@@ -7,6 +7,12 @@ import { SEGMENT_LEN_SEC, UPLOAD_PROGRESS_MAX } from "@/config";
 import type { StreamEvent, ProgressEvent, DeltaEvent, DoneEvent, ErrorEvent } from "@/types/progress";
 import os from "node:os";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_TEMPERATURE = Number(process.env.GEMINI_TEMPERATURE) || 0.4;
+const GEMINI_MAX_OUTPUT_TOKENS = Number(process.env.GEMINI_MAX_OUTPUT_TOKENS) || 4000;
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -127,6 +133,9 @@ export async function POST(req: NextRequest) {
   if (!(file instanceof File) && !uploadId) {
     return new Response(JSON.stringify({ error: "file or uploadId is required" }), { status: 400 });
   }
+  if (uploadId && !UUID_RE.test(uploadId)) {
+    return new Response(JSON.stringify({ error: "invalid uploadId" }), { status: 400 });
+  }
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -134,14 +143,12 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         send(controller, { kind: "progress", phase: "upload", progress: 10, message: "uploading" } as ProgressEvent);
-        // Prepare local file handle
         let localPath: string | null = null;
         if (uploadId) {
           const dir = path.join(os.tmpdir(), "zassha_uploads", uploadId);
           const ext = path.extname(fileName) || ".mp4";
           localPath = path.join(dir, "final" + ext);
         } else {
-          // persist in tmp for potential segmentation
           const f = file as File;
           const buf = new Uint8Array(await f.arrayBuffer());
           const tmp = path.join(os.tmpdir(), `zassha_${Date.now()}_${Math.random().toString(36).slice(2)}${path.extname(f.name) || ".mp4"}`);
@@ -155,12 +162,19 @@ export async function POST(req: NextRequest) {
 
         let prevSummary = "";
         for (let i = 0; i < segments.length; i++) {
-          send(controller, { kind: "progress", phase: "generate", progress: 60 + Math.round((i / Math.max(1, segments.length)) * 35), message: `segment ${i + 1}/${segments.length}`, segmentIndex: i, segmentTotal: segments.length } as ProgressEvent);
+          const segProgress = 60 + Math.round((i / Math.max(1, segments.length)) * 35);
+          send(controller, {
+            kind: "progress",
+            phase: "generate",
+            progress: segProgress,
+            message: `segment ${i + 1}/${segments.length}`,
+            segmentIndex: i,
+            segmentTotal: segments.length,
+          } as ProgressEvent);
           const segPath = segments[i];
           const segExt = path.extname(segPath) || path.extname(localPath!) || ".mp4";
           const segName = `${path.basename(localPath!, path.extname(localPath!))}.seg${i}${segExt}`;
           const upload = await ai.files.upload({ file: await toNodeFile(segPath, segName) });
-          // wait ACTIVE
           const name = upload.name!;
           let latest = upload;
           const startWait = Date.now();
@@ -170,38 +184,68 @@ export async function POST(req: NextRequest) {
             latest = await ai.files.get({ name });
             if (Date.now() - startWait > 120000) throw new Error("Timed out waiting for ACTIVE");
           }
-          const segPrefixJa = prevSummary ? `前セグメントの要約:\n${prevSummary}\n\n` : "";
-          const segPrefixEn = prevSummary ? `Previous segment summary:\n${prevSummary}\n\n` : "";
+          const segPrefix = prevSummary
+            ? (lang === "ja"
+              ? `前セグメントの要約:\n${prevSummary}\n\n`
+              : `Previous segment summary:\n${prevSummary}\n\n`)
+            : "";
           const base = buildPrompts(hint);
-          const segPrompt = mode === "summary"
-            ? (lang === "ja" ? `${segPrefixJa}${base.summary.ja}` : `${segPrefixEn}${base.summary.en}`)
-            : (lang === "ja" ? `${segPrefixJa}${base.detail.ja}` : `${segPrefixEn}${base.detail.en}`);
+          const promptSet = mode === "summary" ? base.summary : base.detail;
+          const segPrompt = segPrefix + promptSet[lang];
 
           const g = await ai.models.generateContentStream({
-            model: "gemini-3-flash-preview",
+            model: GEMINI_MODEL,
             contents: [{ role: "user", parts: [{ text: segPrompt }, { fileData: { mimeType: latest.mimeType!, fileUri: latest.uri! } }] }],
-            config: { temperature: 0.4, maxOutputTokens: 4000 },
+            config: { temperature: GEMINI_TEMPERATURE, maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS },
           });
           for await (const chunk of g as AsyncIterable<{ text?: string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } }>) {
             const t = chunk.text ?? undefined;
             if (t) {
               acc += t;
-              send(controller, { kind: "delta", phase: "stream", progress: 60 + Math.min(35, Math.floor(acc.length / 500)), delta: t, segmentIndex: i, segmentTotal: segments.length } as DeltaEvent);
+              const deltaProgress = 60 + Math.min(35, Math.floor(acc.length / 500));
+              send(controller, {
+                kind: "delta",
+                phase: "stream",
+                progress: deltaProgress,
+                delta: t,
+                segmentIndex: i,
+                segmentTotal: segments.length,
+              } as DeltaEvent);
             }
             if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata as { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
           }
-          // very simple summary for next segment bridging
           prevSummary = summarizeForBridge(acc, lang);
         }
-        // segmentation path already streamed into acc above
 
-        // 'acc' holds the streamed markdown text
-        send(controller, { kind: "done", phase: "done", progress: 100, text: acc, tokens: usageMetadata ? {
-          inputTokens: usageMetadata.promptTokenCount || 0,
-          outputTokens: usageMetadata.candidatesTokenCount || 0,
-          totalTokens: usageMetadata.totalTokenCount || 0
-        } : null } as DoneEvent);
+        const tokens = usageMetadata
+          ? {
+              inputTokens: usageMetadata.promptTokenCount || 0,
+              outputTokens: usageMetadata.candidatesTokenCount || 0,
+              totalTokens: usageMetadata.totalTokenCount || 0,
+            }
+          : null;
+        send(controller, {
+          kind: "done",
+          phase: "done",
+          progress: 100,
+          text: acc,
+          tokens,
+        } as DoneEvent);
         controller.close();
+
+        // Cleanup temporary files (errors are silently ignored)
+        try {
+          if (uploadId) {
+            await fs.rm(path.join(os.tmpdir(), "zassha_uploads", uploadId), { recursive: true, force: true });
+          } else if (localPath) {
+            await fs.rm(localPath, { force: true });
+          }
+          if (localPath) {
+            await fs.rm(localPath + "_segs", { recursive: true, force: true }).catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
       } catch (err) {
         const normalized = normalizeGeminiError(err, lang);
         console.error("[explain/stream] error", err);
@@ -222,7 +266,6 @@ export async function POST(req: NextRequest) {
 
 async function toNodeFile(p: string, name: string) {
   const buf = await fs.readFile(p);
-  // Node 18+ has File in global
   return new File([new Uint8Array(buf)], name, { type: guessVideoMime(name) });
 }
 
@@ -246,8 +289,8 @@ function guessVideoMime(name: string): string {
   }
 }
 
+/** Split video into segments via ffmpeg; falls back to single file on failure. */
 async function segmentVideo(inputPath: string, segmentLenSec: number): Promise<string[]> {
-  // Try to copy-split by segment_time; fallback to single file on failure
   const outDir = path.join(path.dirname(inputPath), path.basename(inputPath) + "_segs");
   await fs.mkdir(outDir, { recursive: true });
   const pattern = path.join(outDir, "part_%03d.mp4");

@@ -3,6 +3,16 @@
 import * as React from "react";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 
+type VideoLightboxProps = {
+  open: boolean;
+  src: string | null;
+  start: number;
+  end: number;
+  poster?: string | null;
+  onClose: () => void;
+  label?: string | null;
+};
+
 export default function VideoLightbox({
   open,
   src,
@@ -11,21 +21,40 @@ export default function VideoLightbox({
   poster,
   onClose,
   label,
-}: {
-  open: boolean;
-  src: string | null;
-  start: number;
-  end: number;
-  poster?: string | null;
-  onClose: () => void;
-  label?: string | null;
-}) {
+}: VideoLightboxProps) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = React.useState(true);
   const [muted, setMuted] = React.useState(true);
   const [volume, setVolume] = React.useState(0.6);
   const [progress, setProgress] = React.useState(0); // 0..1 within [start,end]
   const [seeking, setSeeking] = React.useState(false);
+
+  const isPlayingRef = React.useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  const seekingRef = React.useRef(seeking);
+  seekingRef.current = seeking;
+  const volumeRef = React.useRef(volume);
+  volumeRef.current = volume;
+  const mutedRef = React.useRef(muted);
+  mutedRef.current = muted;
+
+  const togglePlay = React.useCallback(async () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      try { await v.play(); setIsPlaying(true); } catch { /* autoplay may be blocked */ }
+    } else {
+      v.pause();
+      setIsPlaying(false);
+    }
+  }, []);
+
+  const toggleMute = React.useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    setMuted(v.muted);
+  }, []);
 
   React.useEffect(() => {
     if (!open) return;
@@ -36,7 +65,7 @@ export default function VideoLightbox({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, togglePlay, toggleMute]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -45,7 +74,7 @@ export default function VideoLightbox({
     const onLoaded = async () => {
       try {
         v.currentTime = Math.max(0, start);
-        v.volume = volume;
+        v.volume = volumeRef.current;
         v.muted = true; // enforce muted for autoplay
         try {
           await v.play();
@@ -60,11 +89,11 @@ export default function VideoLightbox({
     const onTime = () => {
       if (v.currentTime >= end - 0.05) {
         v.currentTime = Math.max(0, start);
-        if (isPlaying) void v.play().catch(() => {});
+        if (isPlayingRef.current) void v.play().catch(() => {});
       }
       const dur = Math.max(0.001, end - start);
       const p = (v.currentTime - start) / dur;
-      if (!seeking) setProgress(Math.max(0, Math.min(1, p)));
+      if (!seekingRef.current) setProgress(Math.max(0, Math.min(1, p)));
     };
     v.addEventListener("loadedmetadata", onLoaded, { once: true });
     v.addEventListener("timeupdate", onTime);
@@ -75,24 +104,21 @@ export default function VideoLightbox({
       v.removeEventListener("play", onPlay);
       v.removeEventListener("pause", onPause);
     };
-  }, [open, start, end, isPlaying, seeking, volume, muted]);
-
-  const togglePlay = async () => {
-    const v = videoRef.current; if (!v) return;
-    if (v.paused) { try { await v.play(); setIsPlaying(true); } catch {} }
-    else { v.pause(); setIsPlaying(false); }
-  };
-  const toggleMute = () => {
-    const v = videoRef.current; if (!v) return;
-    v.muted = !v.muted; setMuted(v.muted);
-  };
+  }, [open, start, end]);
 
   const onVolumeChange = (val: number) => {
-    const v = videoRef.current; if (!v) return;
+    const v = videoRef.current;
+    if (!v) return;
     const clamped = Math.max(0, Math.min(1, val));
     v.volume = clamped;
     setVolume(clamped);
-    if (clamped === 0) { v.muted = true; setMuted(true); } else if (muted) { v.muted = false; setMuted(false); }
+    if (clamped === 0) {
+      v.muted = true;
+      setMuted(true);
+    } else if (muted) {
+      v.muted = false;
+      setMuted(false);
+    }
   };
 
   const durSec = () => Math.max(0.001, end - start);
@@ -103,7 +129,8 @@ export default function VideoLightbox({
     return `${m}:${ss}`;
   };
   const seekToRatio = (ratio: number) => {
-    const v = videoRef.current; if (!v) return;
+    const v = videoRef.current;
+    if (!v) return;
     const r = Math.max(0, Math.min(1, ratio));
     v.currentTime = start + r * durSec();
     setProgress(r);

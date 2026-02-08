@@ -8,12 +8,19 @@ export const dynamic = "force-dynamic";
 
 const BASE = path.join(os.tmpdir(), "zassha_uploads");
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   const fd = await req.formData();
   const uploadId = (fd.get("uploadId") as string) || "";
-  const index = Number(fd.get("index") || -1);
+  const index = Number(fd.get("index") ?? -1);
   const blob = fd.get("blob");
-  if (!uploadId || index < 0 || !(blob instanceof File)) return Response.json({ error: "bad request" }, { status: 400 });
+
+  const isValid = uploadId && UUID_RE.test(uploadId) && index >= 0 && blob instanceof File;
+  if (!isValid) {
+    return Response.json({ error: "bad request" }, { status: 400 });
+  }
+
   const dir = path.join(BASE, uploadId);
   const manPath = path.join(dir, "manifest.json");
   try {
@@ -22,7 +29,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, expected: manifest.nextIndex }, { status: 409 });
     }
     const partPath = path.join(dir, "file.part");
-    const buf = new Uint8Array(await blob.arrayBuffer());
+    const buf = new Uint8Array(await (blob as File).arrayBuffer());
     await fs.appendFile(partPath, buf);
     manifest.nextIndex += 1;
     await fs.writeFile(manPath, JSON.stringify(manifest));

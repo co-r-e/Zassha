@@ -6,11 +6,38 @@ import { useI18n } from "@/components/i18n-context";
 import { buildDocxSingle, buildXlsxSingle, buildPptxSingle, buildYamlSingle, makeDocLabels, type ImageMap } from "@/lib/exporters";
 import { parseMarkdownContent } from "@/lib/parse-content";
 
+type ExportType = "word" | "excel" | "pptx" | "yaml";
+
+function triggerDownload(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function stripExt(name: string): string {
+  const i = name.lastIndexOf(".");
+  return i > 0 ? name.slice(0, i) : name;
+}
+
+function sanitize(name: string): string {
+  return name.replace(/[^\p{L}\p{N}_\- ]/gu, "_").replace(/\s+/g, "_");
+}
+
+function formatDateYYYYMMDD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}${m}${dd}`;
+}
+
 export default function ExportMenu({ fileId }: { fileId: string }) {
   const { t, lang } = useI18n();
   const { files, resultsById, previewUrlsById, videoMetaById } = useUpload();
   const [open, setOpen] = React.useState(false);
-  const [busy, setBusy] = React.useState<"" | "word" | "excel" | "pptx" | "yaml">("");
+  const [busy, setBusy] = React.useState<"" | ExportType>("");
   const ref = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
@@ -25,7 +52,7 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
   const file = files.find((f) => f.id === fileId) || null;
   const isReady = !!(file && resultsById[fileId]);
 
-  async function handle(type: "word" | "excel" | "pptx" | "yaml") {
+  async function handle(type: ExportType) {
     try {
       setBusy(type);
       if (!file || !isReady) return;
@@ -58,35 +85,13 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
         const blob = await buildPptxSingle({ fileName: file.file.name, content }, images, labels);
         triggerDownload(`zassha_${safeBase}_${today}.pptx`, blob);
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      window.alert(`${t("errorOccurred")} ${msg}`);
     } finally {
       setBusy("");
       setOpen(false);
     }
-  }
-
-  function triggerDownload(name: string, blob: Blob) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  function stripExt(name: string) {
-    const i = name.lastIndexOf(".");
-    return i > 0 ? name.slice(0, i) : name;
-  }
-
-  function sanitize(name: string) {
-    return name.replace(/[^\p{L}\p{N}_\- ]/gu, "_").replace(/\s+/g, "_");
-  }
-
-  function formatDateYYYYMMDD(d: Date) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${y}${m}${dd}`;
   }
 
   async function captureImagesForContent(videoUrl: string, videoDuration: number, content: ReturnType<typeof parseMarkdownContent>): Promise<ImageMap> {
@@ -183,38 +188,22 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
       </button>
       {open && (
         <div className="absolute right-0 mt-1 w-40 rounded-md border border-border bg-card shadow-sm overflow-hidden z-10">
-          <button
-            type="button"
-            className="w-full text-left px-3 py-2 text-[12px] hover:bg-muted disabled:opacity-60"
-            onClick={() => void handle("word")}
-            disabled={!!busy}
-          >
-            {busy === "word" ? "…" : t("downloadWord")}
-          </button>
-          <button
-            type="button"
-            className="w-full text-left px-3 py-2 text-[12px] hover:bg-muted disabled:opacity-60"
-            onClick={() => void handle("pptx")}
-            disabled={!!busy}
-          >
-            {busy === "pptx" ? "…" : t("downloadPptx")}
-          </button>
-          <button
-            type="button"
-            className="w-full text-left px-3 py-2 text-[12px] hover:bg-muted disabled:opacity-60"
-            onClick={() => void handle("excel")}
-            disabled={!!busy}
-          >
-            {busy === "excel" ? "…" : t("downloadExcel")}
-          </button>
-          <button
-            type="button"
-            className="w-full text-left px-3 py-2 text-[12px] hover:bg-muted disabled:opacity-60"
-            onClick={() => void handle("yaml")}
-            disabled={!!busy}
-          >
-            {busy === "yaml" ? "…" : t("downloadYaml")}
-          </button>
+          {([
+            { type: "word", label: "downloadWord" },
+            { type: "pptx", label: "downloadPptx" },
+            { type: "excel", label: "downloadExcel" },
+            { type: "yaml", label: "downloadYaml" },
+          ] as const).map(({ type, label }) => (
+            <button
+              key={type}
+              type="button"
+              className="w-full text-left px-3 py-2 text-[12px] hover:bg-muted disabled:opacity-60"
+              onClick={() => void handle(type)}
+              disabled={!!busy}
+            >
+              {busy === type ? "…" : t(label)}
+            </button>
+          ))}
         </div>
       )}
     </div>
