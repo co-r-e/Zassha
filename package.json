@@ -3,12 +3,32 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/co-r-e/Zassha.git"
+  },
+  "homepage": "https://github.com/co-r-e/Zassha",
   "engines": {
-    "node": ">=18.18"
+    "node": ">=20.9.0"
   },
   "bugs": {
     "url": "https://co-r-e.net/contact"
   },
+  "files": [
+    ".env.example",
+    "LICENSE",
+    "README.md",
+    "README.ja.md",
+    "SECURITY.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "public",
+    "src",
+    "eslint.config.mjs",
+    "next.config.ts",
+    "postcss.config.mjs",
+    "tsconfig.json"
+  ],
   "scripts": {
     "dev": "next dev",
     "start": "next dev",

@@ -79,7 +79,7 @@ Then open http://localhost:3000 in your browser.
 
 ## System Requirements
 - A modern browser (Chrome/Edge/Firefox/Safari).
-- Node.js 18+ (see `.nvmrc`).
+- Node.js 20.9+ (see `.nvmrc`).
 - Optional for very long videos: `ffmpeg` on the server to enable segmentation.
 
 ---
@@ -98,4 +98,8 @@ Then open http://localhost:3000 in your browser.
 - Optional segmentation
   - Set `ZASSHA_SEGMENT_LEN` (seconds) in `.env.local`. Requires `ffmpeg` in PATH. If unset, the app analyzes the whole video without splitting.
 
-License: MIT — see LICENSE. © 2025 CORe Inc.
+## License
+
+The source code in this repository is available under the MIT License. See `LICENSE`.
+
+The `ZASSHA` name, logos, and `CORe Inc.` branding are not granted under the MIT License and remain their respective owners' trademarks.

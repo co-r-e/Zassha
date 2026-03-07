@@ -79,7 +79,7 @@ npm start
 
 ## 動作環境
 - 最新のブラウザ（Chrome / Edge / Firefox / Safari）。
-- Node.js 18 以上（`.nvmrc` を参照）。
+- Node.js 20.9 以上（`.nvmrc` を参照）。
 - 非常に長い動画向け（任意）: サーバーに `ffmpeg` があるとセグメント化が可能。
 
 ---
@@ -98,4 +98,8 @@ npm start
 - セグメント化（任意）
   - `.env.local` に `ZASSHA_SEGMENT_LEN`（秒）を設定。PATH 上の `ffmpeg` が必要。未設定の場合は分割せずに解析します。
 
-ライセンス: MIT — `LICENSE` を参照。© 2025 CORe Inc.
+## ライセンス
+
+このリポジトリのソースコードは MIT ライセンスで提供されます。詳細は `LICENSE` を参照してください。
+
+`ZASSHA` の名称、ロゴ、および `CORe Inc.` のブランド表示は MIT ライセンスの付与対象ではなく、それぞれの権利者に帰属します。
