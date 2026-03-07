@@ -3,23 +3,30 @@
 import * as React from "react";
 import { CHUNK_THRESHOLD_BYTES } from "@/config";
 import { useI18n } from "@/components/i18n-context";
-import type { StreamEvent } from "@/types/progress";
+import type { ParsedContent } from "@/lib/parse-content";
+import type { Phase, StreamEvent } from "@/types/progress";
 
 export type SelectedFile = { id: string; file: File; selected: boolean };
-
-type Tokens = { inputTokens: number; outputTokens: number; totalTokens: number } | null;
+export type Tokens = { inputTokens: number; outputTokens: number; totalTokens: number } | null;
+export type FileState = {
+  progress: number;
+  phase: "idle" | "uploading" | Phase;
+  message?: string;
+  error?: string;
+};
 
 type UploadContextValue = {
   files: SelectedFile[];
   setFiles: React.Dispatch<React.SetStateAction<SelectedFile[]>>;
+  removeFile: (id: string) => void;
   isLoading: boolean;
-  progressById: Record<string, number>;
+  fileStatesById: Record<string, FileState | undefined>;
   error: string | null;
   analysisMode: "summary" | "detail";
   setAnalysisMode: (m: "summary" | "detail") => void;
   hint: string;
   setHint: (v: string) => void;
-  resultsById: Record<string, string>;
+  resultsById: Record<string, ParsedContent>;
   tokensById: Record<string, Tokens>;
   previewUrlsById: Record<string, string>;
   videoMetaById: Record<string, { duration: number; width: number; height: number }>;
@@ -33,6 +40,8 @@ type UploadContextValue = {
 
 const UploadContext = React.createContext<UploadContextValue | null>(null);
 
+const IDLE_STATE: FileState = { progress: 0, phase: "idle" };
+
 export function useUpload() {
   const ctx = React.useContext(UploadContext);
   if (!ctx) throw new Error("useUpload must be used within UploadProvider");
@@ -43,55 +52,98 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const { t, lang } = useI18n();
   const [files, setFiles] = React.useState<SelectedFile[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [resultsById, setResultsById] = React.useState<Record<string, string>>({});
+  const [resultsById, setResultsById] = React.useState<Record<string, ParsedContent>>({});
   const [tokensById, setTokensById] = React.useState<Record<string, Tokens>>({});
+  const [fileStatesById, setFileStatesById] = React.useState<Record<string, FileState | undefined>>({});
   const [error, setError] = React.useState<string | null>(null);
-  const [progressById, setProgressById] = React.useState<Record<string, number>>({});
   const [previewUrlsById, setPreviewUrlsById] = React.useState<Record<string, string>>({});
   const [videoMetaById, setVideoMetaById] = React.useState<Record<string, { duration: number; width: number; height: number }>>({});
   const [analysisMode, setAnalysisMode] = React.useState<"summary" | "detail">("detail");
   const [hint, setHint] = React.useState("");
 
   React.useEffect(() => {
-    const selected = files.filter((f) => f.selected);
-    const needed = new Set(selected.map((sf) => sf.id));
+    const selected = files.filter((file) => file.selected);
+    const needed = new Set(selected.map((file) => file.id));
 
     setPreviewUrlsById((prev) => {
       const next = { ...prev };
-      // Revoke URLs no longer needed
       for (const id of Object.keys(next)) {
         if (!needed.has(id)) {
           URL.revokeObjectURL(next[id]);
           delete next[id];
         }
       }
-      // Create URLs for newly selected files
-      for (const sf of selected) {
-        if (!next[sf.id]) {
-          next[sf.id] = URL.createObjectURL(sf.file);
+      for (const file of selected) {
+        if (!next[file.id]) {
+          next[file.id] = URL.createObjectURL(file.file);
         }
       }
       return next;
     });
   }, [files]);
 
-  // Cleanup on unmount
   React.useEffect(() => {
     return () => {
       setPreviewUrlsById((prev) => {
-        Object.values(prev).forEach((u) => URL.revokeObjectURL(u));
+        Object.values(prev).forEach((url) => URL.revokeObjectURL(url));
         return {};
       });
     };
   }, []);
 
+  function setFileState(id: string, next: Partial<FileState>) {
+    setFileStatesById((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] || IDLE_STATE),
+        ...next,
+      },
+    }));
+  }
+
+  function clearPerFileState(id: string, options?: { keepVideoMeta?: boolean }) {
+    setResultsById((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setTokensById((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setFileStatesById((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    if (!options?.keepVideoMeta) {
+      setVideoMetaById((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+  }
+
   function addVideoFiles(list: FileList | File[]) {
-    const videos = Array.from(list).filter((f) => f.type.startsWith("video/"));
+    const videos = Array.from(list).filter((file) => file.type.startsWith("video/"));
     if (videos.length === 0) return;
     setFiles((prev) => [
       ...prev,
-      ...videos.map((f, idx) => ({ id: `${f.name}_${Date.now()}_${idx}`, file: f, selected: true })),
+      ...videos.map((file, idx) => ({ id: `${file.name}_${Date.now()}_${idx}`, file, selected: true })),
     ]);
+  }
+
+  function removeFile(id: string) {
+    setFiles((prev) => prev.filter((file) => file.id !== id));
+    clearPerFileState(id);
+    setPreviewUrlsById((prev) => {
+      const next = { ...prev };
+      if (next[id]) URL.revokeObjectURL(next[id]);
+      delete next[id];
+      return next;
+    });
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -107,144 +159,184 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     if (list) addVideoFiles(list);
   }
 
+  async function analyzeFile(file: SelectedFile) {
+    let uploadId: string | null = null;
+    if (file.file.size > CHUNK_THRESHOLD_BYTES) {
+      const initFd = new FormData();
+      initFd.append("fileName", file.file.name);
+      initFd.append("size", String(file.file.size));
+      initFd.append("chunkSize", String(5 * 1024 * 1024));
+      const initRes = await fetch("/api/uploads/init", { method: "POST", body: initFd });
+      if (!initRes.ok) throw new Error("init upload failed");
+      const initJson = (await initRes.json()) as { uploadId: string; chunkSize: number };
+      uploadId = initJson.uploadId;
+      const chunkSize = initJson.chunkSize;
+      const total = Math.ceil(file.file.size / chunkSize);
+
+      for (let idx = 0; idx < total; idx++) {
+        const start = idx * chunkSize;
+        const end = Math.min(file.file.size, start + chunkSize);
+        const blob = file.file.slice(start, end);
+        const fd = new FormData();
+        fd.append("uploadId", uploadId);
+        fd.append("index", String(idx));
+        fd.append("blob", blob);
+
+        setFileState(file.id, {
+          phase: "uploading",
+          progress: Math.round((idx / total) * 20),
+          message: t("uploadChunkStatus", idx + 1, total),
+          error: undefined,
+        });
+
+        let ok = false;
+        for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+          const response = await fetch("/api/uploads/append", { method: "POST", body: fd });
+          if (response.ok) {
+            ok = true;
+          } else if (response.status === 409) {
+            const json = await response.json();
+            if (json.expected !== idx) {
+              idx = json.expected - 1;
+              break;
+            }
+          } else if (attempt === 2) {
+            throw new Error("append failed");
+          }
+        }
+
+        setFileState(file.id, {
+          progress: Math.round(((idx + 1) / total) * 20),
+          message: t("uploadChunkStatus", idx + 1, total),
+        });
+      }
+
+      const completeFd = new FormData();
+      completeFd.append("uploadId", uploadId);
+      const completeRes = await fetch("/api/uploads/complete", { method: "POST", body: completeFd });
+      if (!completeRes.ok) throw new Error("complete upload failed");
+    }
+
+    const form = new FormData();
+    if (uploadId) form.append("uploadId", uploadId);
+    else form.append("file", file.file);
+    form.append("fileName", file.file.name);
+    form.append("mode", analysisMode);
+    form.append("lang", lang);
+    if (hint.trim()) form.append("hint", hint.trim());
+
+    const res = await fetch("/api/explain/stream", { method: "POST", body: form });
+    if (!res.ok || !res.body) {
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      const errMsg = typeof json.error === "string" ? json.error : "stream error";
+      throw new Error(errMsg);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let result: ParsedContent | null = null;
+    let tokens: Tokens = null;
+
+    const updateProgress = (progress: number) => {
+      const clamped = Math.max(20, Math.min(100, progress));
+      setFileState(file.id, { progress: clamped });
+    };
+
+    const handleLine = (line: string) => {
+      if (!line.trim()) return;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(line);
+      } catch {
+        return;
+      }
+      const raw = parsed as Record<string, unknown>;
+      if (typeof raw.kind !== "string") return;
+
+      const evt = parsed as StreamEvent;
+      switch (evt.kind) {
+        case "progress":
+          if (typeof evt.progress === "number") updateProgress(evt.progress);
+          setFileState(file.id, {
+            phase: evt.phase,
+            message: evt.message,
+            error: undefined,
+          });
+          break;
+        case "done":
+          result = evt.result;
+          tokens = evt.tokens ?? null;
+          setFileState(file.id, {
+            phase: "done",
+            progress: 100,
+            message: t("analysisDone"),
+            error: undefined,
+          });
+          break;
+        case "error":
+          throw new Error(evt.error.message || "processing error");
+        case "delta":
+          break;
+      }
+    };
+
+    let buffer = "";
+    const drain = () => {
+      let nl = buffer.indexOf("\n");
+      while (nl !== -1) {
+        handleLine(buffer.slice(0, nl));
+        buffer = buffer.slice(nl + 1);
+        nl = buffer.indexOf("\n");
+      }
+    };
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      drain();
+    }
+    buffer += decoder.decode();
+    drain();
+    if (buffer.trim()) handleLine(buffer.trim());
+
+    if (!result) throw new Error(t("emptyResultError"));
+    setResultsById((prev) => ({ ...prev, [file.id]: result! }));
+    setTokensById((prev) => ({ ...prev, [file.id]: tokens }));
+  }
+
   async function handleAnalyze() {
     setError(null);
-    const targets = files.filter((f) => f.selected);
-    if (targets.length === 0) throw new Error(t("noSelectionError"));
-    // Clear only results/tokens for targets to avoid wiping past analyses
-    setResultsById((prev) => {
-      const next = { ...prev };
-      for (const sf of targets) delete next[sf.id];
-      return next;
-    });
-    setTokensById((prev) => {
-      const next = { ...prev };
-      for (const sf of targets) delete next[sf.id];
-      return next;
-    });
+    const targets = files.filter((file) => file.selected);
+    if (targets.length === 0) {
+      setError(t("noSelectionError"));
+      return;
+    }
+
+    for (const file of targets) {
+      clearPerFileState(file.id, { keepVideoMeta: true });
+      setFileState(file.id, { ...IDLE_STATE });
+    }
+
     setIsLoading(true);
+    let failedCount = 0;
     try {
-      for (let i = 0; i < targets.length; i++) {
-        const sf = targets[i];
-        setProgressById((prev) => ({ ...prev, [sf.id]: 0 }));
-        let uploadId: string | null = null;
-        if (sf.file.size > CHUNK_THRESHOLD_BYTES) {
-          // Resumable upload: init
-          const initFd = new FormData();
-          initFd.append("fileName", sf.file.name);
-          initFd.append("size", String(sf.file.size));
-          initFd.append("chunkSize", String(5 * 1024 * 1024));
-          const initRes = await fetch("/api/uploads/init", { method: "POST", body: initFd });
-          if (!initRes.ok) throw new Error("init upload failed");
-          const initJson = (await initRes.json()) as { ok?: boolean; uploadId: string; chunkSize: number };
-          uploadId = initJson.uploadId;
-          const chunkSize = initJson.chunkSize;
-          const total = Math.ceil(sf.file.size / chunkSize);
-          for (let idx = 0; idx < total; idx++) {
-            const start = idx * chunkSize;
-            const end = Math.min(sf.file.size, start + chunkSize);
-            const blob = sf.file.slice(start, end);
-            const fd = new FormData();
-            fd.append("uploadId", uploadId);
-            fd.append("index", String(idx));
-            fd.append("blob", blob);
-            let ok = false;
-            for (let attempt = 0; attempt < 3 && !ok; attempt++) {
-              const r = await fetch("/api/uploads/append", { method: "POST", body: fd });
-              if (r.ok) ok = true;
-              else if (r.status === 409) { const j = await r.json(); if (j.expected !== idx) { idx = j.expected - 1; break; } }
-              else if (attempt === 2) throw new Error("append failed");
-            }
-            setProgressById((prev) => ({ ...prev, [sf.id]: Math.round(((idx + 1) / total) * 20) })); // reserve 0-20% for upload
-          }
-          const cfd = new FormData(); cfd.append("uploadId", uploadId);
-          const comp = await fetch("/api/uploads/complete", { method: "POST", body: cfd });
-          if (!comp.ok) throw new Error("complete upload failed");
+      for (const file of targets) {
+        try {
+          await analyzeFile(file);
+        } catch (err) {
+          failedCount += 1;
+          const message = err instanceof Error ? err.message : t("genericError");
+          setFileState(file.id, {
+            phase: "error",
+            error: message,
+            message,
+          });
         }
-        // Analysis
-        const form = new FormData();
-        if (uploadId) form.append("uploadId", uploadId);
-        else form.append("file", sf.file);
-        form.append("fileName", sf.file.name);
-        form.append("mode", analysisMode);
-        form.append("lang", lang);
-        if (hint && hint.trim()) form.append("hint", hint.trim());
-        const res = await fetch("/api/explain/stream", { method: "POST", body: form });
-        if (!res.ok || !res.body) {
-          const json = await res.json().catch(() => ({})) as Record<string, unknown>;
-          const errMsg = typeof json.error === "string" ? json.error : "stream error";
-          throw new Error(errMsg);
-        }
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let full = "";
-        let tokens: Tokens = null;
-
-        const clampProgress = (p: number) => Math.max(20, Math.min(100, p));
-        const updateProgress = (p: number) =>
-          setProgressById((prev) => ({ ...prev, [sf.id]: clampProgress(p) }));
-
-        const handleLine = (line: string) => {
-          if (!line.trim()) return;
-          let parsed: unknown;
-          try { parsed = JSON.parse(line); } catch { return; }
-
-          const raw = parsed as Record<string, unknown>;
-          if (typeof raw.kind === "string") {
-            const evt = parsed as StreamEvent;
-            switch (evt.kind) {
-              case "progress":
-                if (typeof evt.progress === "number") updateProgress(evt.progress);
-                break;
-              case "delta":
-                if (typeof evt.progress === "number") updateProgress(evt.progress);
-                if ("delta" in evt && typeof evt.delta === "string") full += evt.delta;
-                break;
-              case "done":
-                setProgressById((prev) => ({ ...prev, [sf.id]: 100 }));
-                if (typeof evt.text === "string" && evt.text.length > 0) full = evt.text;
-                if (evt.tokens !== undefined) tokens = evt.tokens as Tokens;
-                break;
-              case "error": {
-                const errEvt = evt as unknown as { error?: { message?: string } };
-                throw new Error(errEvt?.error?.message || "processing error");
-              }
-            }
-          } else {
-            if (typeof raw.progress === "number") updateProgress(raw.progress);
-            if (typeof raw.delta === "string") full += raw.delta;
-            if (typeof raw.text === "string" && raw.text.length > 0) full = raw.text;
-            if (raw.tokens !== undefined) tokens = raw.tokens as Tokens;
-            if (typeof raw.error === "string") throw new Error(raw.error);
-          }
-        };
-
-        let buffer = "";
-        const drainLines = () => {
-          let nl = buffer.indexOf("\n");
-          while (nl !== -1) {
-            handleLine(buffer.slice(0, nl));
-            buffer = buffer.slice(nl + 1);
-            nl = buffer.indexOf("\n");
-          }
-        };
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          drainLines();
-        }
-        buffer += decoder.decode();
-        drainLines();
-        if (buffer.trim()) handleLine(buffer.trim());
-        setResultsById((prev) => ({ ...prev, [sf.id]: full }));
-        setTokensById((prev) => ({ ...prev, [sf.id]: tokens }));
-        setProgressById((prev) => ({ ...prev, [sf.id]: 100 }));
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("genericError"));
     } finally {
       setIsLoading(false);
+      setError(failedCount > 0 ? t("fileFailuresSummary", failedCount, targets.length) : null);
     }
   }
 
@@ -252,17 +344,21 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setFiles([]);
     setResultsById({});
     setTokensById({});
+    setFileStatesById({});
     setError(null);
-    setProgressById({});
     setVideoMetaById({});
-    setPreviewUrlsById({});
+    setPreviewUrlsById((prev) => {
+      Object.values(prev).forEach((url) => URL.revokeObjectURL(url));
+      return {};
+    });
   }
 
   const value: UploadContextValue = {
     files,
     setFiles,
+    removeFile,
     isLoading,
-    progressById,
+    fileStatesById,
     error,
     analysisMode,
     setAnalysisMode,

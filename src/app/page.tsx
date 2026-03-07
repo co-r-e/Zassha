@@ -8,7 +8,7 @@ import { useUpload } from "@/components/upload-context";
 import { useI18n } from "@/components/i18n-context";
 
 export default function Home() {
-  const { files, resultsById, tokensById, previewUrlsById, videoMetaById } = useUpload();
+  const { files, resultsById, tokensById, previewUrlsById, videoMetaById, fileStatesById } = useUpload();
   const { t } = useI18n();
 
   return (
@@ -24,6 +24,7 @@ export default function Home() {
             <div className="min-w-[900px] pr-4 px-2 pb-6">
               {files.map((sf) => {
                 const hasResult = Object.prototype.hasOwnProperty.call(resultsById, sf.id);
+                const fileState = fileStatesById[sf.id];
                 return (
                 <div key={sf.id} className="rounded-xl bg-card p-4 mb-4">
                   <div className="flex items-center justify-between gap-3 text-sm font-semibold mb-4 pb-3 text-primary">
@@ -32,14 +33,18 @@ export default function Home() {
                   </div>
                   {hasResult ? (
                     <ParsedResult
-                      source={resultsById[sf.id]}
+                      result={resultsById[sf.id]}
                       tokens={tokensById[sf.id]}
                       videoUrl={previewUrlsById[sf.id]}
                       videoDurationSec={videoMetaById[sf.id]?.duration}
                     />
+                  ) : fileState?.error ? (
+                    <div className="text-xs text-destructive p-8 text-center border border-dashed border-destructive/40 rounded-md bg-destructive/5">
+                      {fileState.error}
+                    </div>
                   ) : (
                     <div className="text-xs text-muted-foreground p-8 text-center border border-dashed border-border rounded-md bg-muted/20">
-                      {t("willShowAfterAnalysis")}
+                      {fileState?.message || t("willShowAfterAnalysis")}
                     </div>
                   )}
                 </div>

@@ -9,6 +9,8 @@ export type ParsedContent = {
   overview?: string;
   duration?: string;
   businessInference?: string;
+  keyPoints?: string[];
+  nextActions?: string[];
   businessDetails?: Array<{
     stepName: string;
     operations: StepOperation[];
@@ -19,6 +21,193 @@ export type ParsedContent = {
     timeEndSec?: number;
   }>;
 };
+
+function asTrimmedString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized || undefined;
+}
+
+function asFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+export function secondsToTimestampLabel(seconds: number): string {
+  const safe = Math.max(0, Math.round(seconds));
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = safe % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function formatTimestampRange(start?: number, end?: number): string | undefined {
+  if (typeof start === "number" && typeof end === "number" && end > start) {
+    return `${secondsToTimestampLabel(start)}-${secondsToTimestampLabel(end)}`;
+  }
+  if (typeof start === "number") return secondsToTimestampLabel(start);
+  return undefined;
+}
+
+function parseFlexibleTimestampField(raw: string): { start?: number; end?: number; label: string } | null {
+  const stripped = raw.trim().replace(/^\[|\]$/g, "");
+  return parseTimestampField(stripped);
+}
+
+export function normalizeParsedContent(input: unknown, lang: "ja" | "en" = "en"): ParsedContent {
+  const top = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+  const detailsRaw = Array.isArray(top.businessDetails) ? top.businessDetails : [];
+  const businessDetails: NonNullable<ParsedContent["businessDetails"]> = [];
+
+  for (let stepIndex = 0; stepIndex < detailsRaw.length; stepIndex++) {
+    const stepRaw = detailsRaw[stepIndex];
+    const step = stepRaw && typeof stepRaw === "object" ? (stepRaw as Record<string, unknown>) : {};
+    const parsedStepLabel = asTrimmedString(step.stepTimestamp)
+      ? parseFlexibleTimestampField(asTrimmedString(step.stepTimestamp)!)
+      : null;
+    let timeStartSec = asFiniteNumber(step.timeStartSec) ?? parsedStepLabel?.start;
+    let timeEndSec = asFiniteNumber(step.timeEndSec) ?? parsedStepLabel?.end;
+    if (
+      typeof timeStartSec === "number" &&
+      typeof timeEndSec === "number" &&
+      timeEndSec < timeStartSec
+    ) {
+      [timeStartSec, timeEndSec] = [timeEndSec, timeStartSec];
+    }
+
+    const operationsRaw = Array.isArray(step.operations) ? step.operations : [];
+    const operations: StepOperation[] = [];
+    for (const opRaw of operationsRaw) {
+      const op = opRaw && typeof opRaw === "object" ? (opRaw as Record<string, unknown>) : {};
+      const parsedOpLabel = asTrimmedString(op.opTimestamp)
+        ? parseFlexibleTimestampField(asTrimmedString(op.opTimestamp)!)
+        : null;
+      let opStartSec = asFiniteNumber(op.opStartSec) ?? parsedOpLabel?.start;
+      let opEndSec = asFiniteNumber(op.opEndSec) ?? parsedOpLabel?.end;
+      if (
+        typeof opStartSec === "number" &&
+        typeof opEndSec === "number" &&
+        opEndSec < opStartSec
+      ) {
+        [opStartSec, opEndSec] = [opEndSec, opStartSec];
+      }
+      const opTimeSec =
+        asFiniteNumber(op.opTimeSec)
+        ?? (typeof opStartSec === "number" && typeof opEndSec === "number"
+          ? (opStartSec + opEndSec) / 2
+          : opStartSec);
+      const text = asTrimmedString(op.text) || "";
+      const opTimestamp = asTrimmedString(op.opTimestamp) || formatTimestampRange(opStartSec, opEndSec);
+      if (!text && !opTimestamp) continue;
+      operations.push({
+        text,
+        opTimestamp,
+        opTimeSec,
+        opStartSec,
+        opEndSec,
+      });
+    }
+
+    const normalizedStep: NonNullable<ParsedContent["businessDetails"]>[number] = {
+      stepName: asTrimmedString(step.stepName) || (lang === "ja" ? `ステップ${stepIndex + 1}` : `Step ${stepIndex + 1}`),
+      operations,
+      stepTool: asTrimmedString(step.stepTool),
+      stepInference: asTrimmedString(step.stepInference),
+      stepTimestamp: asTrimmedString(step.stepTimestamp) || formatTimestampRange(timeStartSec, timeEndSec),
+      timeStartSec,
+      timeEndSec,
+    };
+
+    const hasContent =
+      normalizedStep.stepName
+      || normalizedStep.stepTool
+      || normalizedStep.stepInference
+      || normalizedStep.stepTimestamp
+      || normalizedStep.operations.length > 0;
+    if (hasContent) businessDetails.push(normalizedStep);
+  }
+
+  const result: ParsedContent = {
+    overview: asTrimmedString(top.overview),
+    duration: asTrimmedString(top.duration),
+    businessInference: asTrimmedString(top.businessInference),
+    keyPoints: Array.isArray(top.keyPoints)
+      ? top.keyPoints.map((item) => asTrimmedString(item)).filter((item): item is string => !!item)
+      : undefined,
+    nextActions: Array.isArray(top.nextActions)
+      ? top.nextActions.map((item) => asTrimmedString(item)).filter((item): item is string => !!item)
+      : undefined,
+    businessDetails,
+  };
+
+  if ((!result.businessDetails || result.businessDetails.length === 0) && result.overview) {
+    result.businessDetails = [
+      {
+        stepName: lang === "ja" ? "自動生成ステップ" : "Auto Step",
+        operations: [{ text: result.overview }],
+      },
+    ];
+  }
+
+  return result;
+}
+
+export function shiftParsedContent(content: ParsedContent, offsetSec: number): ParsedContent {
+  if (!offsetSec) return normalizeParsedContent(content);
+  const shifted = normalizeParsedContent(content);
+  return {
+    ...shifted,
+    businessDetails: (shifted.businessDetails || []).map((step) => {
+      const timeStartSec = typeof step.timeStartSec === "number" ? step.timeStartSec + offsetSec : undefined;
+      const timeEndSec = typeof step.timeEndSec === "number" ? step.timeEndSec + offsetSec : undefined;
+      return {
+        ...step,
+        timeStartSec,
+        timeEndSec,
+        stepTimestamp: formatTimestampRange(timeStartSec, timeEndSec) || step.stepTimestamp,
+        operations: step.operations.map((op) => {
+          const opStartSec = typeof op.opStartSec === "number" ? op.opStartSec + offsetSec : undefined;
+          const opEndSec = typeof op.opEndSec === "number" ? op.opEndSec + offsetSec : undefined;
+          const opTimeSec = typeof op.opTimeSec === "number" ? op.opTimeSec + offsetSec : undefined;
+          return {
+            ...op,
+            opStartSec,
+            opEndSec,
+            opTimeSec,
+            opTimestamp: formatTimestampRange(opStartSec, opEndSec ?? opTimeSec) || op.opTimestamp,
+          };
+        }),
+      };
+    }),
+  };
+}
+
+export function mergeParsedContents(contents: ParsedContent[], lang: "ja" | "en" = "en"): ParsedContent {
+  const normalized = contents
+    .map((content) => normalizeParsedContent(content, lang))
+    .filter((content) => content.overview || content.businessInference || content.businessDetails?.length);
+  if (normalized.length === 0) return { businessDetails: [] };
+
+  const overviews = normalized.map((content) => content.overview).filter((value): value is string => !!value);
+  const durations = normalized.map((content) => content.duration).filter((value): value is string => !!value);
+  const inferences = normalized
+    .map((content) => content.businessInference)
+    .filter((value): value is string => !!value);
+
+  return {
+    overview: overviews[0],
+    duration: durations[durations.length - 1],
+    businessInference: Array.from(new Set(inferences)).join("\n"),
+    keyPoints: Array.from(new Set(normalized.flatMap((content) => content.keyPoints || []))),
+    nextActions: Array.from(new Set(normalized.flatMap((content) => content.nextActions || []))),
+    businessDetails: normalized.flatMap((content) => content.businessDetails || []),
+  };
+}
 
 export function parseTwoColTable(md: string): Array<{ task: string; detail: string }> {
   const lines = md.split(/\r?\n/);
@@ -99,6 +288,8 @@ export function parseMarkdownContent(md: string): ParsedContent {
     { test: (h) => h.startsWith("概要") || h.toLowerCase().startsWith("overview"), section: "overview" },
     { test: (h) => h.startsWith("所要時間") || h.toLowerCase().startsWith("duration"), section: "duration" },
     { test: (h) => h.startsWith("解説") || h.toLowerCase().startsWith("business inference"), section: "businessInference" },
+    { test: (h) => h.startsWith("重要ポイント") || h.toLowerCase().startsWith("key points"), section: "keyPoints" },
+    { test: (h) => h.startsWith("次のアクション") || h.toLowerCase().startsWith("next actions"), section: "nextActions" },
     { test: (h) => h.startsWith("業務詳細") || h.toLowerCase().startsWith("business details"), section: "businessDetails" },
   ];
 
@@ -136,6 +327,16 @@ export function parseMarkdownContent(md: string): ParsedContent {
         break;
       case "businessInference":
         if (!result.businessInference && !trimmed.startsWith("#")) result.businessInference = trimmed.replace(/^\[|\]$/g, "");
+        break;
+      case "keyPoints":
+        if (trimmed.startsWith("- ")) {
+          result.keyPoints = [...(result.keyPoints || []), trimmed.substring(2).trim()];
+        }
+        break;
+      case "nextActions":
+        if (trimmed.startsWith("- ")) {
+          result.nextActions = [...(result.nextActions || []), trimmed.substring(2).trim()];
+        }
         break;
       case "businessDetails": {
         const isTimestamp = /^\*\*(タイムスタンプ|timestamp):\*\*/i.test(trimmed);

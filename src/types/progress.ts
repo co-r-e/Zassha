@@ -1,3 +1,5 @@
+import type { ParsedContent } from "@/lib/parse-content";
+
 export type Phase =
   | "init"
   | "upload"
@@ -26,7 +28,7 @@ export type DeltaEvent = BaseEvent & {
 
 export type DoneEvent = BaseEvent & {
   kind: "done";
-  text: string;
+  result: ParsedContent;
   tokens?: {
     inputTokens: number;
     outputTokens: number;
@@ -42,4 +44,3 @@ export type ErrorEvent = {
 };
 
 export type StreamEvent = ProgressEvent | DeltaEvent | DoneEvent | ErrorEvent;
-

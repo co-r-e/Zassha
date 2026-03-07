@@ -24,6 +24,7 @@ const en = {
   dropOrClick: "Drag & drop videos, or click",
   select: "Select",
   delete: "Delete",
+  retry: "Retry",
   summary: "Summary",
   detail: "Detail",
   hintLabel: "Hint (optional)",
@@ -31,14 +32,20 @@ const en = {
   errorPrefix: "Error",
   apiKeyMissing: "API key is not configured. Set GEMINI_API_KEY in .env.local and restart.",
   analyze: "Analyze",
+  cancelAnalysis: "Cancel",
   analyzeHint: "Please upload videos",
   preview: "Preview",
   showAfterUpload: "It will appear here after upload.",
+  uploadChunkStatus: (current: number, total: number) => `Uploading ${current}/${total}`,
+  analysisDone: "Analysis complete",
+  fileFailuresSummary: (failed: number, total: number) => `${failed} of ${total} analyses failed`,
   // ParsedResult
   unrecognizedFormat: "Could not recognize the parsed text format. Showing raw text.",
   overview: "Overview",
   noOverview: "No overview",
   businessInference: "Business Inference",
+  keyPoints: "Key Points",
+  nextActions: "Next Actions",
   noInference: "No inference",
   tokenUsage: "Token Usage",
   input: "Input",
@@ -98,6 +105,12 @@ const en = {
   // UploadContext errors
   noSelectionError: "No targets selected for analysis",
   genericError: "Processing failed",
+  emptyResultError: "No valid structured result was returned",
+  statusIdle: "Waiting",
+  statusPreparingUpload: "Preparing upload",
+  statusUploadingChunks: (current: number, total: number) => `Uploading chunks ${current}/${total}`,
+  statusDone: "Completed",
+  statusCanceled: "Canceled",
 } as const;
 
 const ja = {
@@ -105,6 +118,7 @@ const ja = {
   dropOrClick: "動画をドラッグ＆ドロップ、またはクリック",
   select: "選択",
   delete: "削除",
+  retry: "再試行",
   summary: "概要",
   detail: "詳細",
   hintLabel: "補足（任意）",
@@ -112,14 +126,20 @@ const ja = {
   errorPrefix: "エラー",
   apiKeyMissing: "APIキーが設定されていません。.env.local に GEMINI_API_KEY を設定し、アプリを再起動してください。",
   analyze: "解析",
+  cancelAnalysis: "中止",
   analyzeHint: "動画をアップロードしてください",
   preview: "プレビュー",
   showAfterUpload: "アップロード後にここに表示されます。",
+  uploadChunkStatus: (current: number, total: number) => `アップロード ${current}/${total}`,
+  analysisDone: "解析完了",
+  fileFailuresSummary: (failed: number, total: number) => `${total}件中${failed}件の解析に失敗しました`,
   // ParsedResult
   unrecognizedFormat: "解析テキストの形式を認識できませんでした。元のテキストを表示します。",
   overview: "概要",
   noOverview: "概要情報なし",
   businessInference: "解説",
+  keyPoints: "重要ポイント",
+  nextActions: "次のアクション",
   noInference: "解説情報なし",
   tokenUsage: "トークン使用量",
   input: "入力",
@@ -179,6 +199,12 @@ const ja = {
   // UploadContext errors
   noSelectionError: "解析対象が選択されていません",
   genericError: "処理に失敗しました",
+  emptyResultError: "有効な構造化結果を受け取れませんでした",
+  statusIdle: "待機中",
+  statusPreparingUpload: "アップロードを準備しています",
+  statusUploadingChunks: (current: number, total: number) => `チャンクをアップロード中 ${current}/${total}`,
+  statusDone: "完了",
+  statusCanceled: "中止しました",
 } as const;
 
 type Dict = typeof en;

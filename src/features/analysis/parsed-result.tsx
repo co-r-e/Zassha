@@ -1,10 +1,9 @@
 "use client";
 
 import * as React from "react";
-import Lightbox from "@/components/ui/lightbox";
 import { Clock, Eye, List } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
-import { parseMarkdownContent, parseTwoColTable } from "@/lib/parse-content";
+import type { ParsedContent } from "@/lib/parse-content";
 import SegmentPlayer from "@/features/analysis/segment-player";
 import VideoLightbox from "@/components/ui/video-lightbox";
 function opDurationSecHelper(
@@ -96,21 +95,20 @@ function formatTimestamp(seconds: number): string {
 }
 
 export default function ParsedResult({
-  source,
+  result,
   tokens,
   videoUrl,
   videoDurationSec,
 }: {
-  source: string;
+  result: ParsedContent;
   tokens?: { inputTokens: number; outputTokens: number; totalTokens: number } | null;
   videoUrl?: string | null;
   videoDurationSec?: number | null;
 }) {
   const { t, lang } = useI18n();
-  const content = React.useMemo(() => parseMarkdownContent(source), [source]);
+  const content = result;
   const [thumbs, setThumbs] = React.useState<Record<string, string | null>>({});
   const [isCapturing, setIsCapturing] = React.useState(false);
-  const [lightbox, setLightbox] = React.useState<{ src: string; alt: string } | null>(null);
   const [videoBox, setVideoBox] = React.useState<{ src: string; start: number; end: number; poster?: string; label?: string } | null>(null);
 
   const formatDurationLabel = (seconds: number): string => {
@@ -257,51 +255,10 @@ export default function ParsedResult({
     };
   }, [videoUrl, videoDurationSec, content, opStartEnd]);
 
-  const tableRows = React.useMemo(() => parseTwoColTable(source), [source]);
-  if (!content.overview && !content.businessDetails?.length && tableRows.length > 0) {
-    return (
-      <div className="w-full">
-        <div className="rounded-md border border-border bg-card p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <List className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">{t("businessDetails")}</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left px-0 py-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-6">No.</th>
-                  <th className="text-left pl-0 pr-2 py-3 text-xs font-semibold text-muted-foreground bg-muted/30 w-40">{t("stepName")}</th>
-                  <th className="text-left p-3 text-xs font-semibold text-muted-foreground bg-muted/30">{t("businessDetails")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableRows.map((r, i) => (
-                  <tr key={i} className="border-b border-border">
-                    <td className="px-0 py-3 align-top">
-                      <div className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">{i + 1}</div>
-                    </td>
-                    <td className="pl-0 pr-2 py-3 align-top">
-                      <div className="text-xs font-medium text-foreground leading-relaxed">{r.task || t("unknown")}</div>
-                    </td>
-                    <td className="p-3 align-top">
-                      <div className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{r.detail || ""}</div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!content.overview && !content.businessDetails?.length) {
+  if (!content.overview && !content.businessDetails?.length && !content.keyPoints?.length) {
     return (
       <div className="text-xs text-muted-foreground">
         {t("unrecognizedFormat")}
-        <pre className="mt-2 whitespace-pre-wrap text-[12px] border border-border rounded-md p-3 bg-card">{source}</pre>
       </div>
     );
   }
@@ -311,7 +268,7 @@ export default function ParsedResult({
       
       <div className="rounded-md border border-border bg-card mb-4">
         <div className="p-4">
-          <div className="grid grid-cols-[400px_400px_200px] gap-6 items-start">
+          <div className="grid grid-cols-[320px_320px_320px_180px] gap-6 items-start">
             
             <div>
               <div className="text-[11px] font-semibold text-muted-foreground mb-1">{t("overview")}</div>
@@ -336,6 +293,29 @@ export default function ParsedResult({
               <div className="text-[14px] text-foreground leading-relaxed">
                 {content.businessInference || t("noInference")}
               </div>
+            </div>
+
+            <div className="space-y-4">
+              {content.keyPoints && content.keyPoints.length > 0 ? (
+                <div>
+                  <div className="text-[11px] font-semibold text-muted-foreground mb-1">{t("keyPoints")}</div>
+                  <ul className="space-y-1 text-[13px] text-foreground leading-relaxed list-disc pl-4">
+                    {content.keyPoints.map((point, idx) => (
+                      <li key={idx}>{point}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {content.nextActions && content.nextActions.length > 0 ? (
+                <div>
+                  <div className="text-[11px] font-semibold text-muted-foreground mb-1">{t("nextActions")}</div>
+                  <ul className="space-y-1 text-[13px] text-foreground leading-relaxed list-disc pl-4">
+                    {content.nextActions.map((action, idx) => (
+                      <li key={idx}>{action}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
 
             
@@ -487,7 +467,6 @@ export default function ParsedResult({
           </div>
         </div>
       )}
-      <Lightbox open={!!lightbox} src={lightbox?.src ?? null} alt={lightbox?.alt ?? ""} onClose={() => setLightbox(null)} />
       <VideoLightbox
         open={!!videoBox}
         src={videoBox?.src ?? null}

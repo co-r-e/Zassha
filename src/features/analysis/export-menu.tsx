@@ -4,7 +4,7 @@ import * as React from "react";
 import { useUpload } from "@/components/upload-context";
 import { useI18n } from "@/components/i18n-context";
 import { buildDocxSingle, buildXlsxSingle, buildPptxSingle, buildYamlSingle, makeDocLabels, type ImageMap } from "@/lib/exporters";
-import { parseMarkdownContent } from "@/lib/parse-content";
+import type { ParsedContent } from "@/lib/parse-content";
 
 type ExportType = "word" | "excel" | "pptx" | "yaml";
 
@@ -59,7 +59,7 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
       const today = formatDateYYYYMMDD(new Date());
       const base = stripExt(file.file.name);
       const safeBase = sanitize(base);
-      const content = parseMarkdownContent(resultsById[fileId]!);
+      const content = resultsById[fileId]!;
 
       if (type === "excel") {
         const sheetName = `zassha_${safeBase}_${today}`;
@@ -94,7 +94,7 @@ export default function ExportMenu({ fileId }: { fileId: string }) {
     }
   }
 
-  async function captureImagesForContent(videoUrl: string, videoDuration: number, content: ReturnType<typeof parseMarkdownContent>): Promise<ImageMap> {
+  async function captureImagesForContent(videoUrl: string, videoDuration: number, content: ParsedContent): Promise<ImageMap> {
     const images: ImageMap = {};
     const v = document.createElement("video");
     v.preload = "metadata";

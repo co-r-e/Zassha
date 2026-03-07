@@ -30,13 +30,16 @@ export default function VideoLightbox({
   const [seeking, setSeeking] = React.useState(false);
 
   const isPlayingRef = React.useRef(isPlaying);
-  isPlayingRef.current = isPlaying;
   const seekingRef = React.useRef(seeking);
-  seekingRef.current = seeking;
   const volumeRef = React.useRef(volume);
-  volumeRef.current = volume;
   const mutedRef = React.useRef(muted);
-  mutedRef.current = muted;
+
+  React.useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    seekingRef.current = seeking;
+    volumeRef.current = volume;
+    mutedRef.current = muted;
+  }, [isPlaying, muted, seeking, volume]);
 
   const togglePlay = React.useCallback(async () => {
     const v = videoRef.current;

@@ -12,6 +12,8 @@ export type DocxLabels = {
   timestamp: string;
   duration: string;
   businessInference: string;
+  keyPoints: string;
+  nextActions: string;
   overviewHeader: string;
   businessDetailsHeader: string;
 };
@@ -25,6 +27,8 @@ export function makeDocLabels(lang: "en" | "ja"): DocxLabels {
       timestamp: "タイムスタンプ",
       duration: "所要時間",
       businessInference: "解説",
+      keyPoints: "重要ポイント",
+      nextActions: "次のアクション",
       overviewHeader: "## 概要",
       businessDetailsHeader: "## 業務詳細",
     };
@@ -36,6 +40,8 @@ export function makeDocLabels(lang: "en" | "ja"): DocxLabels {
     timestamp: "Timestamp",
     duration: "Duration",
     businessInference: "Business Inference",
+    keyPoints: "Key Points",
+    nextActions: "Next Actions",
     overviewHeader: "## Overview",
     businessDetailsHeader: "## Business Details",
   };
@@ -55,6 +61,8 @@ export async function buildDocxSingle(file: ExportFile, images?: ImageMap, label
     timestamp: "Timestamp",
     duration: "Duration",
     businessInference: "Business Inference",
+    keyPoints: "Key Points",
+    nextActions: "Next Actions",
     overviewHeader: "## Overview",
     businessDetailsHeader: "## Business Details",
   };
@@ -69,6 +77,18 @@ export async function buildDocxSingle(file: ExportFile, images?: ImageMap, label
   if (f.content.businessInference) {
     children.push(new Paragraph({ text: L.businessInference, heading: HeadingLevel.HEADING_2 }));
     children.push(new Paragraph({ text: f.content.businessInference }));
+  }
+  if (f.content.keyPoints?.length) {
+    children.push(new Paragraph({ text: L.keyPoints, heading: HeadingLevel.HEADING_2 }));
+    f.content.keyPoints.forEach((item) => {
+      children.push(new Paragraph({ text: item, bullet: { level: 0 } }));
+    });
+  }
+  if (f.content.nextActions?.length) {
+    children.push(new Paragraph({ text: L.nextActions, heading: HeadingLevel.HEADING_2 }));
+    f.content.nextActions.forEach((item) => {
+      children.push(new Paragraph({ text: item, bullet: { level: 0 } }));
+    });
   }
 
   if (f.content.businessDetails && f.content.businessDetails.length) {
@@ -245,6 +265,8 @@ export async function buildPptxSingle(
     timestamp: "Timestamp",
     duration: "Duration",
     businessInference: "Business Inference",
+    keyPoints: "Key Points",
+    nextActions: "Next Actions",
     overviewHeader: "## Overview",
     businessDetailsHeader: "## Business Details",
   };
@@ -299,6 +321,8 @@ export async function buildPptxSingle(
     if (file.content.overview) bullets.push(file.content.overview);
     if (file.content.duration) bullets.push(`${L.duration}: ${file.content.duration}`);
     if (file.content.businessInference) bullets.push(`${L.businessInference}: ${file.content.businessInference}`);
+    if (file.content.keyPoints?.length) bullets.push(`${L.keyPoints}: ${file.content.keyPoints.join(" / ")}`);
+    if (file.content.nextActions?.length) bullets.push(`${L.nextActions}: ${file.content.nextActions.join(" / ")}`);
     if (bullets.length) {
       slide.addText(
         bullets.map((t) => ({ text: t, options: { bullet: true, fontFace: font, fontSize: 16 } })),
@@ -413,6 +437,8 @@ export async function buildYamlSingle(file: ExportFile): Promise<Blob> {
     overview: file.content.overview || undefined,
     duration: file.content.duration || undefined,
     businessInference: file.content.businessInference || undefined,
+    keyPoints: file.content.keyPoints?.length ? file.content.keyPoints : undefined,
+    nextActions: file.content.nextActions?.length ? file.content.nextActions : undefined,
     businessDetails: (file.content.businessDetails || []).map((s) => ({
       stepName: s.stepName,
       stepTool: s.stepTool || undefined,
