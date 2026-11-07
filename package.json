@@ -9,7 +9,7 @@
   },
   "homepage": "https://github.com/co-r-e/Zassha",
   "engines": {
-    "node": ">=20.9.0"
+    "node": "^24.22.2 || ^26.13.0"
   },
   "bugs": {
     "url": "https://co-r-e.net/contact"
@@ -37,40 +37,41 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@google/genai": "^1.13.0",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-switch": "^1.2.5",
+    "@google/genai": "^3.0.0",
+    "@radix-ui/react-slot": "^1.5.0",
+    "@radix-ui/react-switch": "^1.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "docx": "^8.6.0",
+    "docx": "^9.15.3",
     "exceljs": "^4.4.0",
-    "jszip": "^3.10.1",
-    "lucide-react": "^0.539.0",
-    "next": "^16.1.6",
+    "jszip": "^3.10.2",
+    "lucide-react": "^1.70.0",
+    "next": "^16.4.5",
     "next-themes": "^0.4.6",
     "pptxgenjs": "^4.0.1",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "tailwind-merge": "^3.3.1"
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.4.5",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^6.0.3"
   },
   "overrides": {
-    "ajv": "6.14.0",
-    "js-yaml": "4.1.1",
-    "jws": "4.0.1",
-    "minimatch": "3.1.5",
-    "readdir-glob": {
-      "minimatch": "5.1.8"
+    "pptxgenjs": {
+      "image-size": "2.1.0"
     },
-    "tar": "7.5.10"
+    "exceljs": {
+      "uuid": "11.1.1"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.5"
+    }
   }
 }

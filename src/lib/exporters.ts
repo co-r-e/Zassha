@@ -174,7 +174,7 @@ export async function buildDocxSingle(file: ExportFile, images?: ImageMap, label
 }
 
 export async function buildXlsxSingle(file: ExportFile, sheetName: string): Promise<Blob> {
-  const ExcelJS: typeof import("exceljs") = await import("exceljs");
+  const { default: ExcelJS } = await import("exceljs");
   const wb = new ExcelJS.Workbook();
   {
     const ws = wb.addWorksheet(sanitizeSheetName(sheetName));

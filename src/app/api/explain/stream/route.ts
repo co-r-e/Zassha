@@ -395,7 +395,8 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ error: "invalid uploadId" }), { status: 400 });
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  // SDK 3 の既定値変更後も、既存のモデルと Files API の互換性を保つ
+  const ai = new GoogleGenAI({ apiKey, apiVersion: "v1beta" });
 
   const stream = new ReadableStream({
     async start(controller) {
